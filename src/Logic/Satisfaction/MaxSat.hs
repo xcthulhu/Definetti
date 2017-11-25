@@ -1,11 +1,8 @@
-module Logic.Satisfaction.MaxSat() where
-import           Control.Monad              (MonadPlus, guard, join, mplus,
-                                             msum, mzero)
-import           Data.Maybe                 (listToMaybe)
-import           Data.Set                   (Set, (\\))
-import qualified Data.Set                   as Set
+module Logic.Satisfaction.MaxSat(dpll) where
+import           Control.Monad                   (MonadPlus, guard, msum, mzero)
+import           Data.Set                        (Set, (\\))
+import qualified Data.Set                        as Set
 import           Logic.Formula.Data.Literal
-import           Logic.Formula.Data.MaxSatClause
 
 neg :: Literal p -> Literal p
 neg (Pos p) = Neg p
@@ -21,7 +18,7 @@ data Sequent p = (Set (Literal p)) :|-: Set (Set (Literal p)) deriving Show
  - where B' has no clauses with x,
  - and all instances of -x are deleted -}
 unitP :: Ord p => Literal p -> Sequent p -> Sequent p
-unitP x (assms :|-:  clauses) = (assms' :|-:  clauses')
+unitP x (assms :|-:  clauses) = assms' :|-:  clauses'
   where
     assms' = Set.insert x assms
     clauses_ = Set.filter (not . (x `Set.member`)) clauses
@@ -29,6 +26,7 @@ unitP x (assms :|-:  clauses) = (assms' :|-:  clauses')
 
 {- Find literals that only occur positively or negatively
  - and perform unit propogation on these -}
+pureRule :: (Ord p, MonadPlus m) => Sequent p -> m (Sequent p)
 pureRule sequent@(_ :|-:  clauses) =
   let
     sign (Pos _) = True
@@ -36,27 +34,31 @@ pureRule sequent@(_ :|-:  clauses) =
     -- Partition the positive and negative formulae
     (positive,negative) = Set.partition sign (Set.unions . Set.toList $ clauses)
     -- Compute the literals that are purely positive/negative
-    purePositive = positive \\ (Set.map neg negative)
-    pureNegative = negative \\ (Set.map neg positive)
-    pure = purePositive `Set.union` pureNegative
+    purePositive = positive \\ Set.map neg negative
+    pureNegative = negative \\ Set.map neg positive
+    pureLiterals = purePositive `Set.union` pureNegative
     -- Unit Propagate the pure literals
-    sequent' = foldr unitP sequent pure
-  in if (not $ Set.null pure) then return sequent'
+    sequent' = foldr unitP sequent pureLiterals
+  in if not $ Set.null pureLiterals then return sequent'
      else mzero
 
 {- Add any singleton clauses to the assumptions
  - and simplify the clauses -}
+oneRule :: (Ord p, MonadPlus m) => Sequent p -> m (Sequent p)
 oneRule sequent@(_ :|-:  clauses) =
    do
    -- Extract literals that occur alone and choose one
    let singletons = concatMap Set.toList . filter isSingle $ Set.toList clauses
    case singletons of
      x:_ -> return $ unitP x sequent  -- Return the new simplified problem
-     [] -> mzero
+     []  -> mzero
    where
-     isSingle c = case (Set.toList c) of { [a] -> True ; _ -> False }
+     isSingle c = case Set.toList c of { [_] -> True ; _ -> False }
 
 {- ------------------------------ DPLL Algorithm ----------------------------- -}
+dpll ::
+  (Ord p, MonadPlus m) =>
+  Set (Set (Literal p)) -> m (Set (Literal p))
 dpll goalClauses = dpll' $ Set.empty :|-: goalClauses
   where
      dpll' sequent@(assms :|-: clauses) = do

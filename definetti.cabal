@@ -14,33 +14,34 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
-  build-depends:       base >= 4.7 && < 5
-                     , mtl >= 2.2 && < 2.3
-                     , dlist >= 0.8 && < 0.9
-                     , containers >= 0.5 && < 0.6
-                     , hspec >= 2.4 && < 2.5
-                     , QuickCheck >= 2.9 && < 2.10
+  build-depends:       base        >= 4.7 && < 5
+                     , containers  >= 0.5 && < 0.6
+                     , dlist       >= 0.8 && < 0.9
+                     , mtl         >= 2.2 && < 2.3
   default-language:    Haskell2010
-
-executable definetti-exe
-  hs-source-dirs:      app
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , definetti
-  default-language:    Haskell2010
+  exposed-modules:     Logic.Formula.Data.Propositional
+  ghc-options:         -Wall
 
 test-suite definetti-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
+  main-is:             TestSuite.hs
   build-depends:       base
+                     , QuickCheck       >= 2.9  && < 2.10
                      , definetti
-                     , hspec >= 2.4 && < 2.5
-                     , QuickCheck >= 2.9 && < 2.10
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+                     , tasty            >= 0.11 && < 0.12
+                     , tasty-discover   >= 3.0  && < 4.0
+                     , tasty-quickcheck >= 0.8  && < 0.9
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  other-modules:       Logic.Formula.Data.Propositional.QuickCheck
+                     , Logic.Formula.Transform.TseitinTest
   default-language:    Haskell2010
 
-source-repository head
-  type:     git
-  location: https://github.com/githubuser/definetti
+test-suite hlint
+  type:                exitcode-stdio-1.0
+  main-is:             HLint.hs
+  build-depends:       base
+                     , hlint >= 1.9
+  hs-source-dirs:      test
+  default-language:    Haskell2010
+  ghc-options:         -Wall

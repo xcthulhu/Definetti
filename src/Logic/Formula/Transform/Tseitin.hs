@@ -39,19 +39,16 @@ defineHardSubClause (Not a) =
 defineHardSubClause (a :&: b) =
   do aMaxSatClause <- defineHardSubClause a
      aVar <- get
-     let a_ = Definition aVar -- definitional literal for a subformula
+     let a_ = Definition aVar
      bMaxSatClause <- defineHardSubClause b
      bVar <- get
-     let b_ = Definition bVar -- lieral for b subform
+     let b_ = Definition bVar
      newVar <- freshVar
      let c_ = Definition newVar
      return $
-       (DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_ ]) -- (~c \/ a) which means c -> a
-                       , Hard (Set.fromList [ Neg c_, Pos b_ ]) -- (~c \/ b) which means c -> b
-                       , Hard (Set.fromList [ Neg a_, Neg b_, Pos c_ ]) ]) -- (~a \/ ~b \/ c)
-                                                                           -- which means a -> (~b \/ c)
-                                                                           -- which means a -> (b -> c)
-                                                                           -- which means (a /\ b) -> c
+       DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_ ])
+                      , Hard (Set.fromList [ Neg c_, Pos b_ ])
+                      , Hard (Set.fromList [ Neg a_, Neg b_, Pos c_ ]) ]
        `mappend` aMaxSatClause `mappend` bMaxSatClause
 
 defineHardSubClause (a :|: b) =
@@ -64,9 +61,9 @@ defineHardSubClause (a :|: b) =
      newVar <- freshVar
      let c_ = Definition newVar
      return $
-       (DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_, Pos b_ ])
+       DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_, Pos b_ ])
                        , Hard (Set.fromList [ Neg a_, Pos c_ ])
-                       , Hard (Set.fromList [ Neg b_, Pos c_ ]) ])
+                       , Hard (Set.fromList [ Neg b_, Pos c_ ]) ]
        `mappend` aMaxSatClause `mappend` bMaxSatClause
 
 defineHardSubClause (a :->: b) = defineHardSubClause (Not a :|: b)
@@ -81,13 +78,13 @@ defineSoftClause :: Ord a => Propositional a -> State Int (DList.DList (MaxSatCl
 defineSoftClause f =
   do hardMaxSatClauses <- defineHardSubClause f
      lastVar <- get
-     return $ (return $ Soft (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
+     return $ return (Soft (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
 
 defineHardClause :: Ord a => Propositional a -> State Int (DList.DList (MaxSatClause (Definitional a)))
 defineHardClause f =
   do hardMaxSatClauses <- defineHardSubClause f
      lastVar <- get
-     return $ (return $ Hard (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
+     return $ return (Hard (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
 
 tseitinSoft :: Ord a => [Propositional a] -> [MaxSatClause (Definitional a)]
 tseitinSoft forms =
