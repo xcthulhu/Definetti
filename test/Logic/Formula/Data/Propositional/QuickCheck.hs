@@ -7,6 +7,7 @@ import           Test.QuickCheck
 instance Arbitrary a => Arbitrary (Propositional a) where
   arbitrary = sized sizedArbitraryProposition
     where
+      -- | Create a propositional formula that has at most depth n
       sizedArbitraryProposition :: Arbitrary a => Int -> Gen (Propositional a)
       sizedArbitraryProposition n
         | n <= 0 = fmap Proposition arbitrary

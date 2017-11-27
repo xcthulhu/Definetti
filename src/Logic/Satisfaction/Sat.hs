@@ -1,6 +1,6 @@
-module Logic.Satisfaction.MaxSat(dpll) where
+module Logic.Satisfaction.Sat (dpll) where
 import           Control.Monad                   (MonadPlus, guard, msum, mzero)
-import           Data.Set                        (Set, (\\))
+import           Data.Set                        ((\\))
 import qualified Data.Set                        as Set
 import           Logic.Formula.Data.Literal
 
@@ -11,7 +11,7 @@ neg (Neg p) = Pos p
 -- We model DPLL like a sequent calculus
 -- LHS: a set of assumptions / partial model (set of literals)
 -- RHS: a set of goals
-data Sequent p = (Set (Literal p)) :|-: Set (Set (Literal p)) deriving Show
+data Sequent p = Clause p :|-: Set.Set (Clause p) deriving Show
 
 {- --------------------------- Goal Reduction Rules -------------------------- -}
 {- "Unit Propogation" takes literal x and A :|-: B to A,x :|-: B',
@@ -58,18 +58,19 @@ oneRule sequent@(_ :|-:  clauses) =
 {- ------------------------------ DPLL Algorithm ----------------------------- -}
 dpll ::
   (Ord p, MonadPlus m) =>
-  Set (Set (Literal p)) -> m (Set (Literal p))
+  Set.Set (Clause p) -> m (Set.Set p)
 dpll goalClauses = dpll' $ Set.empty :|-: goalClauses
   where
+     insertPositiveAtom (Pos a) atoms = Set.insert a atoms
+     insertPositiveAtom (Neg _) atoms = atoms
      dpll' sequent@(assms :|-: clauses) = do
        -- Fail early if falsum is a subgoal
        guard $ not (Set.empty `Set.member` clauses)
        case concatMap Set.toList $ Set.toList clauses of
-         -- Return the assumptions if there are no subgoals left
-         []  -> return assms
+         -- Return the positive assumptions if there are no subgoals left
+         []  -> return (Set.fold insertPositiveAtom Set.empty assms)
          -- Otherwise try various tactics for resolving goals
          x:_ -> dpll' =<< msum [ pureRule sequent
-                                , oneRule sequent
-                                , return $ unitP x sequent
-                                , return $ unitP (neg x) sequent ]
-
+                               , oneRule sequent
+                               , return $ unitP x sequent
+                               , return $ unitP (neg x) sequent ]

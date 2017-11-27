@@ -16,10 +16,12 @@ library
   exposed-modules:     Lib
   build-depends:       base        >= 4.7 && < 5
                      , containers  >= 0.5 && < 0.6
-                     , dlist       >= 0.8 && < 0.9
                      , mtl         >= 2.2 && < 2.3
   default-language:    Haskell2010
-  exposed-modules:     Logic.Formula.Data.Propositional
+  exposed-modules:     Logic.Formula.Data.Literal
+                     , Logic.Formula.Data.Propositional
+                     , Logic.Formula.Transform.Tseitin
+                     , Logic.Satisfaction.Sat
   ghc-options:         -Wall
 
 test-suite definetti-test
@@ -28,6 +30,7 @@ test-suite definetti-test
   main-is:             TestSuite.hs
   build-depends:       base
                      , QuickCheck       >= 2.9  && < 2.10
+                     , containers       >= 0.5 && < 0.6
                      , definetti
                      , tasty            >= 0.11 && < 0.12
                      , tasty-discover   >= 3.0  && < 4.0

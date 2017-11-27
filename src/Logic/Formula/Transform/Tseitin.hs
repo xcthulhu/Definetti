@@ -1,99 +1,101 @@
-module Logic.Formula.Transform.Tseitin ( tseitinSoft, tseitinHard ) where
+module Logic.Formula.Transform.Tseitin (definitionalClauses) where
 
 import           Control.Monad.State
-import qualified Data.DList                       as DList
 import qualified Data.Set                         as Set
 import           Logic.Formula.Data.Literal
-import           Logic.Formula.Data.MaxSatClause
 import           Logic.Formula.Data.Propositional
 
-freshVar :: State Int Int
-freshVar =
+getFreshDefinitionalLiteral :: State Int (Definitional a)
+getFreshDefinitionalLiteral =
   do lastVar <- get
-     let newVar = lastVar + 1
-     put newVar
-     return newVar
+     let freshVar = lastVar + 1
+     put freshVar
+     return $ Definition freshVar
 
-defineHardSubClause :: Ord a => Propositional a -> State Int (DList.DList (MaxSatClause (Definitional a)))
-defineHardSubClause (Proposition a) =
-  do let a_ = Atom a
-     newVar <- freshVar
-     let b_ = Definition newVar
-     return $ DList.fromList [Hard (Set.fromList [Neg b_, Pos a_]), Hard (Set.fromList [Neg a_, Pos b_])]
+getLastDefinitionalLiteral :: State Int (Definitional a)
+getLastDefinitionalLiteral =
+  do lastVar <- get
+     return $ Definition lastVar
 
-defineHardSubClause (Not (Proposition a)) =
-  do let a_ = Atom a
-     newVar <- freshVar
-     let b_ = Definition newVar
-     return $ DList.fromList [Hard (Set.fromList [Neg b_, Neg a_]), Hard (Set.fromList [Pos a_, Pos b_])]
+insert2 :: Ord a => a -> a -> Set.Set a -> Set.Set a
+insert2 x y set = Set.insert x (Set.insert y set)
 
-defineHardSubClause (Not a) =
-  do clause <- defineHardSubClause a
-     aVar <- get
-     let a_ = Definition aVar
-     newVar <- freshVar
-     let b_ = Definition newVar
+insert3 :: Ord a => a -> a -> a -> Set.Set a -> Set.Set a
+insert3 x y z set = Set.insert x (Set.insert y (Set.insert z set))
+
+set2 :: Ord a => a -> a -> Set.Set a
+set2 x y = insert2 x y Set.empty
+
+set3 :: Ord a => a -> a -> a -> Set.Set a
+set3 x y z = insert3 x y z Set.empty
+
+defineSubClause ::
+  Ord a =>
+  Propositional a ->
+  State Int (Set.Set (Clause (Definitional a)))
+defineSubClause (Proposition a) =
+  do fresh <- getFreshDefinitionalLiteral
+     return $ set2 (set2 (Neg fresh)    (Pos (Atom a)))
+                   (set2 (Neg (Atom a)) (Pos fresh))
+
+defineSubClause (Not (Proposition a)) =
+  do fresh <- getFreshDefinitionalLiteral
+     return $ set2 (set2 (Neg fresh)    (Neg (Atom a)))
+                   (set2 (Pos (Atom a)) (Pos fresh))
+
+defineSubClause (Not a) =
+  do clause <- defineSubClause a
+     notADef <- getLastDefinitionalLiteral
+     fresh <- getFreshDefinitionalLiteral
      return $
-       DList.fromList [Hard (Set.fromList [Neg b_, Pos a_]), Hard (Set.fromList [Neg a_, Pos b_])] `mappend` clause
+       Set.fromList [set2 (Neg fresh) (Pos notADef), set2 (Neg notADef) (Pos fresh)] `mappend` clause
 
-defineHardSubClause (a :&: b) =
-  do aMaxSatClause <- defineHardSubClause a
-     aVar <- get
-     let a_ = Definition aVar
-     bMaxSatClause <- defineHardSubClause b
-     bVar <- get
-     let b_ = Definition bVar
-     newVar <- freshVar
-     let c_ = Definition newVar
+defineSubClause (a :&: b) =
+  do aMaxSatClause <- defineSubClause a
+     aDef <- getLastDefinitionalLiteral
+     bMaxSatClause <- defineSubClause b
+     bDef <- getLastDefinitionalLiteral
+     fresh <- getFreshDefinitionalLiteral
      return $
-       DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_ ])
-                      , Hard (Set.fromList [ Neg c_, Pos b_ ])
-                      , Hard (Set.fromList [ Neg a_, Neg b_, Pos c_ ]) ]
+       Set.fromList [ Set.fromList [Neg fresh, Pos aDef]
+                      , Set.fromList [Neg fresh, Pos bDef]
+                      , Set.fromList [Neg aDef, Neg bDef, Pos fresh]]
        `mappend` aMaxSatClause `mappend` bMaxSatClause
 
-defineHardSubClause (a :|: b) =
-  do aMaxSatClause <- defineHardSubClause a
-     aVar <- get
-     let a_ = Definition aVar
-     bMaxSatClause <- defineHardSubClause b
-     bVar <- get
-     let b_ = Definition bVar
-     newVar <- freshVar
-     let c_ = Definition newVar
+defineSubClause (a :|: b) =
+  do aMaxSatClause <- defineSubClause a
+     a_ <- getLastDefinitionalLiteral
+     bMaxSatClause <- defineSubClause b
+     b_ <- getLastDefinitionalLiteral
+     c_ <- getFreshDefinitionalLiteral
      return $
-       DList.fromList [ Hard (Set.fromList [ Neg c_, Pos a_, Pos b_ ])
-                       , Hard (Set.fromList [ Neg a_, Pos c_ ])
-                       , Hard (Set.fromList [ Neg b_, Pos c_ ]) ]
+       Set.fromList [ Set.fromList [Neg c_, Pos a_, Pos b_]
+                    , Set.fromList [Neg a_, Pos c_]
+                    , Set.fromList [Neg b_, Pos c_]]
        `mappend` aMaxSatClause `mappend` bMaxSatClause
 
-defineHardSubClause (a :->: b) = defineHardSubClause (Not a :|: b)
-defineHardSubClause Verum =
-  do newVar <- freshVar
-     return $ DList.fromList [ Hard (Set.fromList [Pos (Definition newVar)])]
-defineHardSubClause Falsum =
-  do newVar <- freshVar
-     return $ DList.fromList [ Hard (Set.fromList [Neg (Definition newVar)])]
+defineSubClause (a :->: b) = defineSubClause (Not a :|: b)
 
-defineSoftClause :: Ord a => Propositional a -> State Int (DList.DList (MaxSatClause (Definitional a)))
-defineSoftClause f =
-  do hardMaxSatClauses <- defineHardSubClause f
-     lastVar <- get
-     return $ return (Soft (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
+defineSubClause Verum =
+  do a_ <- getFreshDefinitionalLiteral
+     return ( Set.fromList [Set.fromList [Pos a_]] )
 
-defineHardClause :: Ord a => Propositional a -> State Int (DList.DList (MaxSatClause (Definitional a)))
-defineHardClause f =
-  do hardMaxSatClauses <- defineHardSubClause f
-     lastVar <- get
-     return $ return (Hard (Set.fromList [Pos (Definition lastVar)])) `mappend` hardMaxSatClauses
+defineSubClause Falsum =
+  do a_ <- getFreshDefinitionalLiteral
+     return ( Set.fromList [Set.fromList [Neg a_]] )
 
-tseitinSoft :: Ord a => [Propositional a] -> [MaxSatClause (Definitional a)]
-tseitinSoft forms =
-  let formDCNFDefinitions = map defineSoftClause forms
-      dCNFDLists = evalState (sequence formDCNFDefinitions) 0
-  in DList.toList $ mconcat dCNFDLists
+defineClause ::
+  Ord a =>
+  Propositional a ->
+  State Int (Set.Set (Clause (Definitional a)))
+defineClause f =
+  do subFormulaClauses <- defineSubClause f
+     top <- getLastDefinitionalLiteral
+     return ( Set.insert (Set.fromList [Pos top]) subFormulaClauses )
 
-tseitinHard :: Ord a => [Propositional a] -> Set.Set (MaxSatClause (Definitional a))
-tseitinHard forms =
-  let formDCNFDefinitions = map defineHardClause forms
-      dCNFDLists = evalState (sequence formDCNFDefinitions) 0
-  in (Set.fromList . DList.toList . mconcat) dCNFDLists
+definitionalClauses ::
+  Ord a =>
+  [Propositional a] ->
+  [Set.Set (Clause (Definitional a))]
+definitionalClauses propositions =
+  evalState (mapM defineClause propositions) 0
