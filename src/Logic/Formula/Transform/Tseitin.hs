@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Logic.Formula.Transform.Tseitin (definitionalClauses) where
 
 import           Control.Monad.State
@@ -5,14 +6,18 @@ import qualified Data.Set                         as Set
 import           Logic.Formula.Data.Literal
 import           Logic.Formula.Data.Propositional
 
-getFreshDefinitionalLiteral :: State Int (Definitional a)
+type Idx = Int
+initialIdx :: Idx
+initialIdx = 0
+
+getFreshDefinitionalLiteral :: State Idx (Definitional a)
 getFreshDefinitionalLiteral =
   do lastVar <- get
      let freshVar = lastVar + 1
      put freshVar
      return $ Definition freshVar
 
-getLastDefinitionalLiteral :: State Int (Definitional a)
+getLastDefinitionalLiteral :: State Idx (Definitional a)
 getLastDefinitionalLiteral =
   do lastVar <- get
      return $ Definition lastVar
@@ -29,65 +34,79 @@ set2 x y = insert2 x y Set.empty
 set3 :: Ord a => a -> a -> a -> Set.Set a
 set3 x y z = insert3 x y z Set.empty
 
-defineSubClause ::
-  Ord a =>
-  Propositional a ->
-  State Int (Set.Set (Clause (Definitional a)))
+data PairClauses a = PairClauses { aDef :: a
+                                 , bDef :: a
+                                 , fresh :: a
+                                 , abCombinedClauses :: Set.Set (Clause a)
+                                 }
+
+extractPairClausesDefinitions
+  :: Ord a
+  => Propositional a
+  -> Propositional a
+  -> State Int (PairClauses (Definitional a))
+extractPairClausesDefinitions a b =
+  do aClauses <- defineSubClause a
+     aDef <- getLastDefinitionalLiteral
+     bClauses <- defineSubClause b
+     bDef <- getLastDefinitionalLiteral
+     fresh <- getFreshDefinitionalLiteral
+     return $ PairClauses aDef bDef fresh (aClauses `mappend` bClauses)
+
+defineSubClause
+  :: Ord a
+  => Propositional a
+  -> State Int (Set.Set (Clause (Definitional a)))
 defineSubClause (Proposition a) =
   do fresh <- getFreshDefinitionalLiteral
-     return $ set2 (set2 (Neg fresh)    (Pos (Atom a)))
-                   (set2 (Neg (Atom a)) (Pos fresh))
+     return (set2 (set2 (Neg fresh)    (Pos (Atom a)))
+                  (set2 (Neg (Atom a)) (Pos fresh)))
 
 defineSubClause (Not (Proposition a)) =
   do fresh <- getFreshDefinitionalLiteral
-     return $ set2 (set2 (Neg fresh)    (Neg (Atom a)))
-                   (set2 (Pos (Atom a)) (Pos fresh))
+     return (set2 (set2 (Neg fresh)    (Neg (Atom a)))
+                  (set2 (Pos (Atom a)) (Pos fresh)))
 
 defineSubClause (Not a) =
-  do clause <- defineSubClause a
-     notADef <- getLastDefinitionalLiteral
+  do aClauses <- defineSubClause a
+     aDef <- getLastDefinitionalLiteral
      fresh <- getFreshDefinitionalLiteral
-     return $
-       Set.fromList [set2 (Neg fresh) (Pos notADef), set2 (Neg notADef) (Pos fresh)] `mappend` clause
+     return (insert2 (set2 (Neg fresh) (Neg aDef))
+                     (set2 (Pos aDef)  (Pos fresh))
+                     aClauses)
+
 
 defineSubClause (a :&: b) =
-  do aMaxSatClause <- defineSubClause a
-     aDef <- getLastDefinitionalLiteral
-     bMaxSatClause <- defineSubClause b
-     bDef <- getLastDefinitionalLiteral
-     fresh <- getFreshDefinitionalLiteral
-     return $
-       Set.fromList [ Set.fromList [Neg fresh, Pos aDef]
-                      , Set.fromList [Neg fresh, Pos bDef]
-                      , Set.fromList [Neg aDef, Neg bDef, Pos fresh]]
-       `mappend` aMaxSatClause `mappend` bMaxSatClause
+  do PairClauses {..} <- extractPairClausesDefinitions a b
+     return (insert3 (set2 (Neg fresh) (Pos aDef))
+                     (set2 (Neg fresh) (Pos bDef))
+                     (set3 (Neg aDef)  (Neg bDef) (Pos fresh))
+                     abCombinedClauses)
 
 defineSubClause (a :|: b) =
-  do aMaxSatClause <- defineSubClause a
-     a_ <- getLastDefinitionalLiteral
-     bMaxSatClause <- defineSubClause b
-     b_ <- getLastDefinitionalLiteral
-     c_ <- getFreshDefinitionalLiteral
-     return $
-       Set.fromList [ Set.fromList [Neg c_, Pos a_, Pos b_]
-                    , Set.fromList [Neg a_, Pos c_]
-                    , Set.fromList [Neg b_, Pos c_]]
-       `mappend` aMaxSatClause `mappend` bMaxSatClause
+  do PairClauses {..} <- extractPairClausesDefinitions a b
+     return (insert3 (set3 (Neg fresh) (Pos aDef) (Pos bDef))
+                     (set2 (Neg aDef)  (Pos fresh))
+                     (set2 (Neg bDef)  (Pos fresh))
+                     abCombinedClauses)
 
-defineSubClause (a :->: b) = defineSubClause (Not a :|: b)
+defineSubClause (a :->: b) =
+  do PairClauses {..} <- extractPairClausesDefinitions a b
+     return (insert3 (set3 (Neg fresh) (Neg aDef) (Pos bDef))
+                     (set2 (Pos aDef)  (Pos fresh))
+                     (set2 (Neg bDef)  (Pos fresh))
+                     abCombinedClauses)
 
 defineSubClause Verum =
-  do a_ <- getFreshDefinitionalLiteral
-     return ( Set.fromList [Set.fromList [Pos a_]] )
+  fmap ( Set.singleton . Set.singleton . Pos ) getFreshDefinitionalLiteral
 
 defineSubClause Falsum =
-  do a_ <- getFreshDefinitionalLiteral
-     return ( Set.fromList [Set.fromList [Neg a_]] )
+  fmap ( Set.singleton . Set.singleton . Neg ) getFreshDefinitionalLiteral
 
 defineClause ::
   Ord a =>
   Propositional a ->
-  State Int (Set.Set (Clause (Definitional a)))
+  State Idx (Set.Set (Clause (Definitional a)))
 defineClause f =
   do subFormulaClauses <- defineSubClause f
      top <- getLastDefinitionalLiteral
@@ -98,4 +117,4 @@ definitionalClauses ::
   [Propositional a] ->
   [Set.Set (Clause (Definitional a))]
 definitionalClauses propositions =
-  evalState (mapM defineClause propositions) 0
+  evalState (mapM defineClause propositions) initialIdx

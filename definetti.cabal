@@ -35,6 +35,7 @@ test-suite definetti-test
                      , tasty            >= 0.11 && < 0.12
                      , tasty-discover   >= 3.0  && < 4.0
                      , tasty-quickcheck >= 0.8  && < 0.9
+                     , tasty-hunit      >= 0.9  && < 1.0
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   other-modules:       Logic.Formula.Data.Propositional.QuickCheck
                      , Logic.Formula.Transform.TseitinTest

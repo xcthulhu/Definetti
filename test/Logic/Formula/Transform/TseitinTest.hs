@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Logic.Formula.Transform.TseitinTest (test_tseitin) where
+module Logic.Formula.Transform.TseitinTest (test_generativeTseitin, test_hunitTseitin) where
 
+import qualified Data.Maybe
 import qualified Data.Set                                    as Set
 import           Logic.Formula.Data.Literal
 import           Logic.Formula.Data.Propositional
@@ -8,6 +9,7 @@ import           Logic.Formula.Data.Propositional.QuickCheck ()
 import           Logic.Formula.Transform.Tseitin
 import           Logic.Satisfaction.Sat
 import           Test.Tasty
+import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck
 
 extractPropositionalAtoms :: Ord a => Propositional a -> Set.Set a
@@ -47,7 +49,7 @@ m |= (Proposition p) = p `Set.member` m
 m |= (Not f)         = not (m |= f)
 m |= (a :&: b)       = (m |= a) && (m |= b)
 m |= (a :|: b)       = (m |= a) || (m |= b)
-m |= (a :->: b)      = m |= ((Not a) :|: b)
+m |= (a :->: b)      = m |= (Not a :|: b)
 _ |= Verum           = True
 _ |= Falsum          = False
 
@@ -57,17 +59,31 @@ extractModelFromDPLLSat = Set.fold addAtom Set.empty
     addAtom (Atom a) collectedAtoms       = Set.insert a collectedAtoms
     addAtom (Definition _) collectedAtoms = collectedAtoms
 
-dpllMaybeModel :: Ord a => Propositional a -> Maybe (Set.Set a)
-dpllMaybeModel = fmap extractModelFromDPLLSat . dpll . Set.unions . definitionalClauses . (:[])
+tseitinProposition :: Ord a => Propositional a -> Set.Set (Clause (Definitional a))
+tseitinProposition = Set.unions . definitionalClauses . (:[])
 
-test_tseitin :: TestTree
-test_tseitin = testGroup "Tseitin Tests"
+dpllProposition :: Ord a => Propositional a -> Maybe (Set.Set (Definitional a))
+dpllProposition = dpll . tseitinProposition
+
+dpllMaybeModel :: Ord a => Propositional a -> Maybe (Set.Set a)
+dpllMaybeModel = fmap extractModelFromDPLLSat . dpllProposition
+
+test_generativeTseitin :: TestTree
+test_generativeTseitin = testGroup "Tseitin Generative Tests"
   [
     testProperty "Tseitin transformation preserves propositional atoms"
-     $ \p -> extractPropositionalAtoms (p :: Propositional Int)
-             == (extractClauseAtoms . head . definitionalClauses) [p]
+      $ \p -> extractPropositionalAtoms (p :: Propositional Char)
+              == (extractClauseAtoms . head . definitionalClauses) [p]
   , testProperty "Models found for clauses for Tseitin transformed proposition satisfy original proposition"
-     $ \p -> case (dpllMaybeModel (p :: Propositional Int)) of
-               Nothing -> True
-               Just m  -> m |= p
+      $ \p -> case dpllMaybeModel (p :: Propositional Char) of
+                Nothing -> True
+                Just m  -> m |= p
+  ]
+
+test_hunitTseitin :: TestTree
+test_hunitTseitin = testGroup "Tseitin Unit Tests"
+  [
+     testCase "∄ℳ. ℳ ⊨ ⊤ → ⊥" $ dpllProposition ((Verum :: Propositional Char) :->: Falsum) @?= Nothing
+  ,  testCase "∄ℳ. ℳ ⊨ ⊥" $ dpllProposition (Falsum :: Propositional Char) @?= Nothing
+  ,  testCase "∃ℳ. ℳ ⊨ ⊤" $ assert (Data.Maybe.isJust (dpllProposition (Verum :: Propositional Char)))
   ]
