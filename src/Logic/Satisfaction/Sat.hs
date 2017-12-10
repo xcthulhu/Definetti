@@ -56,9 +56,10 @@ oneRule sequent@(_ :|-:  clauses) =
      isSingle c = case Set.toList c of { [_] -> True ; _ -> False }
 
 {- ------------------------------ DPLL Algorithm ----------------------------- -}
-dpll ::
-  (Ord p, MonadPlus m) =>
-  Set.Set (Clause p) -> m (Set.Set p)
+dpll
+  :: (Ord p, MonadPlus m)
+  => Set.Set (Clause p)
+  -> m (Set.Set p)
 dpll goalClauses = dpll' $ Set.empty :|-: goalClauses
   where
      insertPositiveAtom (Pos a) atoms = Set.insert a atoms

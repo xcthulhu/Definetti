@@ -22,6 +22,7 @@ library
                      , Logic.Formula.Data.Propositional
                      , Logic.Formula.Transform.Tseitin
                      , Logic.Satisfaction.Sat
+                     , Logic.Satisfaction.PropositionalSat
   ghc-options:         -Wall
 
 test-suite definetti-test
