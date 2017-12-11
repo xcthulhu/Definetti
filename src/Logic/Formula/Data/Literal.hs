@@ -1,10 +1,11 @@
 module Logic.Formula.Data.Literal ( Literal(..), Definitional(..), Clause ) where
+import Logic.Formula.Data.Propositional (Propositional)
 import qualified Data.Set as Set
 
 -- | Definitional Atoms
 -- Inspired by John Harrison's "Handbook of Practical Logic and Automated Reasoning", Section 2.8, pgs. 75-77
-data Definitional a = Definition Int  -- ^ Represents a literal that defines a subterm
-                    | Atom a          -- ^ Represents a literal for an atom in a formula
+data Definitional a = Definition (Propositional a)  -- ^ Represents a literal that defines a subterm
+                    | Atom a                        -- ^ Represents a literal for an atom in a formula
                     deriving (Ord, Show, Eq)
 
 -- | Definitional Literals for Definitional Conjunctive Normal Form
