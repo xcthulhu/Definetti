@@ -1,7 +1,7 @@
 module Logic.Satisfaction.Sat (dpll) where
-import           Control.Monad                   (MonadPlus, guard, msum, mzero)
-import           Data.Set                        ((\\))
-import qualified Data.Set                        as Set
+import           Control.Monad              (MonadPlus, guard, msum, mzero)
+import           Data.Set                   ((\\))
+import qualified Data.Set                   as Set
 import           Logic.Formula.Data.Literal
 
 neg :: Literal p -> Literal p
@@ -13,7 +13,7 @@ neg (Neg p) = Pos p
 -- RHS: a set of goals
 data Sequent p = Clause p :|-: Set.Set (Clause p) deriving Show
 
-{- --------------------------- Goal Reduction Rules -------------------------- -}
+{- ----------------------- Goal Reduction Rules ---------------------- -}
 {- "Unit Propogation" takes literal x and A :|-: B to A,x :|-: B',
  - where B' has no clauses with x,
  - and all instances of -x are deleted -}

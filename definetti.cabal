@@ -25,14 +25,21 @@ library
                      , Logic.Satisfaction.PropositionalSat
   ghc-options:         -Wall
 
+executable definetti-shephard
+  main-is:             Main.hs
+  hs-source-dirs:      app
+  build-depends:       definetti
+                     , base                 >= 4.7  && < 5
+                     , optparse-applicative >= 0.13 && < 0.14
+
 test-suite definetti-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             TestSuite.hs
-  build-depends:       base
+  build-depends:       definetti
+                     , base             >= 4.7  && < 5
                      , QuickCheck       >= 2.9  && < 2.10
-                     , containers       >= 0.5 && < 0.6
-                     , definetti
+                     , containers       >= 0.5  && < 0.6
                      , tasty            >= 0.11 && < 0.12
                      , tasty-discover   >= 3.0  && < 4.0
                      , tasty-quickcheck >= 0.8  && < 0.9

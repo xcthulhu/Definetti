@@ -20,6 +20,7 @@ definitionalSubClauses
   :: Ord a
   => Propositional a
   -> Set.Set (Clause (Definitional a))
+
 definitionalSubClauses p@(Proposition a) =
   let p' = Definition p
   in set2 (set2 (Neg p')       (Pos (Atom a)))
