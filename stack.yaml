@@ -41,7 +41,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps: []
 
-# Override default flag values for local packages and extra-deps
+# Override defaultl flag values for local packages and extra-deps
 flags: {}
 
 # Extra package databases containing global packages
@@ -49,7 +49,12 @@ extra-package-dbs: []
 
 # Control whether we use the GHC we find on the path
 # system-ghc: true
-#
+
+nix:
+  enable: true
+  packages:
+    - glpk
+
 # Require a specific version of stack, using version ranges
 # require-stack-version: -any # Default
 # require-stack-version: ">=1.5"

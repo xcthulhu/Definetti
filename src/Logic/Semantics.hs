@@ -1,15 +1,20 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Logic.Semantics (Semantics (..), ModelSearch (..)) where
+module Logic.Semantics (Semantics ((|=)), ModelSearch (findModel)) where
 
--- | Model theoretic semantics
+-- | Truth-functional semantics
 class Semantics model formula where
+  infixr 6 |=
   (|=) :: model -> formula -> Bool
 
--- | ModelSearch law:
+-- | ModelSearch
+--
+-- Model Search extends truth functional semantics
+-- with a model search procedure that obeys the
+-- the following law:
 --
 -- @
--- all (|= p) (ModelSearch p)
+-- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
 -- @
-
-class Semantics model formula => ModelSearch model formula where
-  findModel :: formula -> Maybe model
+--
+class (Semantics model formula, Functor m) => ModelSearch m model formula where
+  findModel :: formula -> m model
