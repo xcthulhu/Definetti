@@ -8,9 +8,9 @@ module Logic.CNF ( Literal (Pos, Neg)
                  , DisjClause
                  , CNF )
 where
-import           Control.Applicative (Alternative, empty, pure)
+import           Control.Applicative (Alternative, empty, pure, (<|>))
 import           Control.Monad       (MonadPlus, guard, msum)
-import qualified Data.Foldable       (fold)
+import qualified Data.Foldable       (asum, fold)
 import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
@@ -116,3 +116,24 @@ instance ( Ord p
             , return (unitPropogate (Data.Set.singleton x) sequent)
             , return (unitPropogate ((Data.Set.singleton . neg) x) sequent)
             ]
+
+
+{- ------ MaxSat ------ -}
+
+choose :: Alternative f => Int -> Int -> [a] -> f [a]
+choose n count clauses
+  | n == 0            = pure []
+  | n == count        = pure clauses
+  | [] <- clauses     = empty
+  | n > count        = empty
+  | n < 0            = empty
+  | (x:xs) <- clauses = choose n count' xs
+                       <|> fmap (x:) (choose (n - 1) count' xs)
+  where
+     count' = count - 1
+
+powerList :: Alternative f => [a] -> f [a]
+powerList xs =
+  Data.Foldable.asum (fmap (\n -> choose n total xs) [total,total-1..0])
+  where
+    total = length xs
