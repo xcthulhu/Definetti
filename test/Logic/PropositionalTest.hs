@@ -95,7 +95,7 @@ test_hunitSimpleIdentities = testGroup "Simple Model Search Tests" $
          assert ( (fmap (|= a) searchResult == Just False)
                  || (fmap (|= b) searchResult == Just False) )
      , testCase ( "Exists m s.t. `(m |= (a :&&: (b :||: c))) "
-                  <> "&& ( m |= (a :&&: b) || m |= (a :&&: c) )`" )
+                  <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`" )
        $ let searchResult = findModel' (a :&&: (b :||: c)) in
          assert ( (fmap (|= (a :&&: b)) searchResult == Just True)
                  || (fmap (|= (a :&&: c)) searchResult == Just True) )
