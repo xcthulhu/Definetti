@@ -6,10 +6,12 @@ module Logic.CNF ( Literal (Pos, Neg)
                  , Clause
                  , ConjClause
                  , DisjClause
-                 , CNF )
+                 , CNF
+                 , maxSat)
 where
 import           Control.Applicative (Alternative, empty, pure, (<|>))
 import           Control.Monad       (MonadPlus, guard, msum)
+import           Data.DList          (DList)
 import qualified Data.Foldable       (asum, fold)
 import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
@@ -117,23 +119,31 @@ instance ( Ord p
             , return (unitPropogate ((Data.Set.singleton . neg) x) sequent)
             ]
 
-
 {- ------ MaxSat ------ -}
 
-choose :: Alternative f => Int -> Int -> [a] -> f [a]
-choose n count clauses
+choose :: Alternative f => [a] -> Int -> Int -> f [a]
+choose clauses count n
   | n == 0            = pure []
   | n == count        = pure clauses
+  | n < 0             = empty
+  | n > count         = empty
   | [] <- clauses     = empty
-  | n > count        = empty
-  | n < 0            = empty
-  | (x:xs) <- clauses = choose n count' xs
-                       <|> fmap (x:) (choose (n - 1) count' xs)
+  | (x:xs) <- clauses = choose xs count' n 
+                        <|> fmap (x:) (choose xs count' (n - 1))
   where
      count' = count - 1
 
 powerList :: Alternative f => [a] -> f [a]
 powerList xs =
-  Data.Foldable.asum (fmap (\n -> choose n total xs) [total,total-1..0])
+  Data.Foldable.asum (fmap (choose xs total) [total,total-1..0])
   where
     total = length xs
+
+maxSat :: ( Ord a
+          , MonadPlus m
+          , ModelSearch m model (CNF a))
+          => [CNF a]
+          -> m ([CNF a], model)
+maxSat = msum
+         . (fmap (\cs -> ((,) cs) <$> (findModel . Data.Foldable.fold) cs))
+         . (powerList :: [a] -> DList [a])
