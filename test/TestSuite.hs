@@ -1,8 +1,5 @@
-import           Logic.PropositionalTest (test_hunitSimpleIdentities,
-                                          test_qcPropositionalSemanticsLaws)
-import           Test.Tasty              (defaultMain, testGroup)
+import           Logic.PropositionalTest (propositionalTests)
+import           Test.Tasty              (defaultMain)
 
 main :: IO ()
-main = defaultMain
-  $ testGroup "Tests" [ test_hunitSimpleIdentities
-                      , test_qcPropositionalSemanticsLaws]
+main = defaultMain propositionalTests

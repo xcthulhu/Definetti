@@ -7,7 +7,8 @@ module Logic.CNF ( Literal (Pos, Neg)
                  , ConjClause
                  , DisjClause
                  , CNF
-                 , maxSat)
+                 , maxSat
+                 , maxSatN )
 where
 import           Control.Applicative (Alternative, empty, pure, (<|>))
 import           Control.Monad       (MonadPlus, guard, msum)
@@ -46,17 +47,17 @@ neg (Pos p) = Neg p
 neg (Neg p) = Pos p
 
 -- | State for DPLL is modeled like logical deduction
--- LHS: a set of assumptions / partial model (conjunction of literals)
--- RHS: A set of goals in conjunctive normal form
+--   LHS: a set of assumptions / partial model (conjunction of literals)
+--   RHS: A set of goals in conjunctive normal form
 data Sequent p = ConjClause p :|-: CNF p
 
 {- Goal Reduction Rules -}
 
 -- | Unit Propogation
--- Takes literals `L` and sequent `A :|-: B` to `L ∪ A :|-: B'`
--- where `B'` is defined by
---  * Every instance of `¬x` is removed from all clauses in B for all `x ∈ L`
---  * All clauses in `B` containing some `x ∈ L` are removed
+--   Takes literals `L` and sequent `A :|-: B` to `L ∪ A :|-: B'`
+--   where `B'` is defined by
+--    * Every instance of `¬x` is removed from all clauses in B for all `x ∈ L`
+--    * All clauses in `B` containing some `x ∈ L` are removed
 unitPropogate :: Ord p => ConjClause p -> Sequent p -> Sequent p
 unitPropogate literals (assms :|-: clauses) =
   let
@@ -66,9 +67,9 @@ unitPropogate literals (assms :|-: clauses) =
   in (literals <> assms) :|-: filterSatisfied (resolve clauses)
 
 -- | Pure Rule
--- A literal is said to be _pure_ in a CNF if all instances have the same sign
--- (either all `Pos` or all `Neg`).
--- This rule finds all pure literals and performs unit propogation on them
+--   A literal is said to be _pure_ in a CNF if all instances have the same sign
+--   (either all `Pos` or all `Neg`).
+--   This rule finds all pure literals and performs unit propogation on them
 pureRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
 pureRule sequent@(_ :|-: clauses) =
   let
@@ -84,8 +85,8 @@ pureRule sequent@(_ :|-: clauses) =
      else (pure . unitPropogate (purePos <> pureNeg)) sequent
 
 -- | One Rule
--- If a clause `{x}` occurs in a CNF, add the clause to the assumptions
--- and perform unit propogation to eliminate the literal `x`
+--   If a clause `{x}` occurs in a CNF, add the clause to the assumptions
+--   and perform unit propogation to eliminate the literal `x`
 oneRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
 oneRule sequent@(_ :|-:  clauses) =
    let
@@ -95,9 +96,11 @@ oneRule sequent@(_ :|-:  clauses) =
       then empty
       else (pure . unitPropogate singletons) sequent
 
+{- Core Search Algorithm -}
+
 -- | Answer-Sat using DPLL
--- By using an underlying model search procedure for conjuncts of clauses
--- DPLL can be used to lift that procedure to CNFs of clauses
+--   By using an underlying model search procedure for conjuncts of clauses
+--   DPLL can be used to lift that procedure to CNFs of clauses
 instance ( Ord p
          , MonadPlus m
          , ModelSearch m model (ConjClause p) )
@@ -121,17 +124,21 @@ instance ( Ord p
 
 {- ------ MaxSat ------ -}
 
+-- TODO: Use ListLike
+-- TODO: Use interleave https://mail.haskell.org/pipermail/haskell-cafe/2003-June/004484.html
+
+-- | Choose `k` elements of a collection of `n` items
+--   Results in `n choose k = n! / (k!(n-k)!)`
+--   Lifted into an `Alternative` functor (so DList may be used)
 choose :: Alternative f => [a] -> Int -> Int -> f [a]
-choose clauses count n
-  | n == 0            = pure []
-  | n == count        = pure clauses
-  | n < 0             = empty
-  | n > count         = empty
+choose clauses n k
+  | k < 0             = empty
+  | k > n             = empty
+  | k == 0            = pure []
   | [] <- clauses     = empty
-  | (x:xs) <- clauses = choose xs count' n 
-                        <|> fmap (x:) (choose xs count' (n - 1))
-  where
-     count' = count - 1
+  | k == n            = pure clauses
+  | (x:xs) <- clauses = choose xs n' k <|> fmap (x:) (choose xs n' (k - 1))
+    where n' = n - 1
 
 powerList :: Alternative f => [a] -> f [a]
 powerList xs =
@@ -139,11 +146,25 @@ powerList xs =
   where
     total = length xs
 
+-- | Find the largest sublist of CNFs simultaneously satisfiable from a list
 maxSat :: ( Ord a
-          , MonadPlus m
-          , ModelSearch m model (CNF a))
-          => [CNF a]
-          -> m ([CNF a], model)
+         , MonadPlus m
+         , ModelSearch m model (CNF a) )
+         => [CNF a]
+         -> m ([CNF a], model)
 maxSat = msum
-         . (fmap (\cs -> ((,) cs) <$> (findModel . Data.Foldable.fold) cs))
+         . fmap (\cs -> (,) cs <$> (findModel . Data.Foldable.fold) cs)
          . (powerList :: [a] -> DList [a])
+
+-- | Determine if the largest sublist of CNFs simultaneously satisfiable
+--   has length no bigger than `n`
+maxSatN :: ( Ord a
+          , MonadPlus m
+          , ModelSearch m model (CNF a) )
+          => Int
+          -> [CNF a]
+          -> m model
+maxSatN n = msum . fmap (findModel . Data.Foldable.fold) . chooseN
+  where
+    chooseN :: [a] -> DList [a]
+    chooseN xs = choose xs (length xs) (n + 1)

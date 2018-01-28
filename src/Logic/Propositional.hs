@@ -2,12 +2,14 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
-module Logic.Propositional (Propositional (..))
+{-# LANGUAGE AllowAmbiguousTypes #-}
+module Logic.Propositional (Propositional (..), Probability (..), probGT)
 where
 import           Control.Monad   (MonadPlus)
 import           Data.Monoid     (mempty, (<>))
 import qualified Data.Set        (Set, insert, singleton)
-import           Logic.CNF       (CNF, Clause, ConjClause, Literal (Neg, Pos))
+import           Logic.CNF       (CNF, Clause, ConjClause, Literal (Neg, Pos),
+                                  maxSatN)
 import           Logic.Semantics (ModelSearch (findModel), Semantics ((|=)))
 
 -- | Formulae of the Propositional Calculus
@@ -36,12 +38,12 @@ instance Semantics model (Clause p) => Semantics model (Propositional p) where
 -- "Handbook of Practical Logic and Automated Reasoning" (2009),
 -- Section 2.8, pgs. 75-77
 --
--- Note: Definitional literals use the propositions they represent themselves
---       as labels.
+-- Note:
+--   Definitional literals use the propositions they represent themselves
+--   as labels.
 --
---       This makes them referentially transparent.
---
---       It also the Tseitin transformation to avoid using `State`.
+--   This is a _referentially transparent_ of creating labels,
+--   however it differs from Harrison's method (which uses a counter as state).
 data Definitional p =
     Definition (Propositional p)  -- ^ a literal that defines a subterm
   | Atom p                        -- ^ a literal for an atomic proposition
@@ -55,11 +57,11 @@ instance Semantics model (Clause p)
         where
           checkSatisfied (Pos (Definition f)) = m |= f
           checkSatisfied (Pos (Atom a))       = m |= Proposition a
-          checkSatisfied (Neg ℓ)              = (not . checkSatisfied . Pos) ℓ
+          checkSatisfied (Neg l)              = (not . checkSatisfied . Pos) l
 
 -- | ModelSearch for Conjunctions of Literals of Definitional Atoms
--- Only literals representing actual atoms are used.
--- Model search proceeds ignoring the definitional atoms.
+-- When finding a model for a conjunction of literals of definitional atoms,
+-- model search proceeds ignoring the definitional atoms.
 instance ( Ord p
          , MonadPlus m
          , ModelSearch m model (ConjClause p) )
@@ -152,3 +154,38 @@ instance ( Ord p
          => ModelSearch m model (Propositional p)
   where
     findModel = findModel . tseitinTransform
+
+-- | Probability Inequalities
+
+data Probability p = Pr (Propositional p)
+                   | Const Double
+                   | (Probability p) :+ (Probability p)
+
+extractPropositions :: Probability p -> [Propositional p]
+extractPropositions (Pr p)    = [p]
+extractPropositions (Const _) = []
+extractPropositions (x :+ y)  =
+  extractPropositions x ++ extractPropositions y
+
+extractConstantTerm :: Probability p -> Double
+extractConstantTerm (Pr _)    = 0
+extractConstantTerm (Const d) = d
+extractConstantTerm (x :+ y) = extractConstantTerm x + extractConstantTerm y
+
+probGT :: ( Ord p
+         , MonadPlus m
+         , ModelSearch m model (ConjClause p) )
+         => Probability p
+         -> Probability p
+         -> m model
+probGT leftHandSide rightHandSide =
+  maxSatN capacity clauses
+  where
+    leftHandPropositions = extractPropositions leftHandSide
+    rightHandPropositions = extractPropositions rightHandSide
+    clauses = fmap tseitinTransform
+              (fmap Not rightHandPropositions ++ leftHandPropositions)
+    capacity = floor ( fromIntegral (length rightHandPropositions)
+                     + extractConstantTerm rightHandSide
+                     - extractConstantTerm leftHandSide)
+

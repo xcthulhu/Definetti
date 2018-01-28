@@ -1,25 +1,23 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
-module Logic.PropositionalTest
-  (
-    test_hunitSimpleIdentities
-  , test_qcPropositionalSemanticsLaws
-  )
+module Logic.PropositionalTest (propositionalTests)
 where
 
 import           Control.Applicative   (Alternative, empty, pure)
 import           Control.Monad         (liftM2)
-import qualified Data.Maybe            (isJust)
+import qualified Data.Maybe            (isJust, isNothing)
 import           Data.Monoid           ((<>))
 import qualified Data.Set              (Set, filter, map, member)
 import           Logic.CNF             (ConjClause, Literal (Neg, Pos))
-import           Logic.Propositional   (Propositional (..))
-import           Logic.Semantics       (ModelSearch (findModel),
-                                        Semantics ((|=)))
-import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, oneof,
-                                        sized)
+import           Logic.Propositional   ( Propositional (..)
+                                       , Probability (..)
+                                       , probGT )
+import           Logic.Semantics       ( ModelSearch (findModel)
+                                       , Semantics ((|=)))
+import           Test.QuickCheck       ( Arbitrary (arbitrary)
+                                       , Gen, oneof, sized )
 import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (assert, testCase, (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
@@ -48,6 +46,7 @@ instance Ord p => Semantics (Data.Set.Set p) (ConjClause p) where
       checkSatisfied (Pos p) = p `Data.Set.member` m
       checkSatisfied (Neg p) = not (p `Data.Set.member` m)
 
+-- | ModelSearch for free boolean logic, with no underlying decision procedure
 instance (Ord p, Alternative f) => ModelSearch f (Data.Set.Set p) (ConjClause p)
   where
     findModel clause =
@@ -62,14 +61,15 @@ instance (Ord p, Alternative f) => ModelSearch f (Data.Set.Set p) (ConjClause p)
         positive (Pos _) = True
         positive (Neg _) = False
 
-test_hunitSimpleIdentities :: TestTree
-test_hunitSimpleIdentities = testGroup "Simple Model Search Tests" $
+propositionalIdentitiesHUnit :: TestTree
+propositionalIdentitiesHUnit = testGroup "Simple Model Search Tests" $
   let
     a = Proposition 'a'
     b = Proposition 'b'
     c = Proposition 'c'
     findModel' = findModel :: Propositional Char -> Maybe (Data.Set.Set Char)
-  in [
+  in
+    [
       testCase "No m s.t. `m |= (Verum :->: Falsum)`"
       $ findModel' (Verum :->: Falsum) @?= Nothing
     , testCase "No m s.t. `m |= Falsum`"
@@ -99,20 +99,60 @@ test_hunitSimpleIdentities = testGroup "Simple Model Search Tests" $
        $ let searchResult = findModel' (a :&&: (b :||: c)) in
          assert ( (fmap (|= (a :&&: b)) searchResult == Just True)
                  || (fmap (|= (a :&&: c)) searchResult == Just True) )
-
     ]
 
-test_qcPropositionalSemanticsLaws :: TestTree
-test_qcPropositionalSemanticsLaws = testGroup "Propositional Semantics Laws" $
+propositionalSemanticsQC :: TestTree
+propositionalSemanticsQC = testGroup "Propositional Semantics Laws" $
   let
     findModel' = findModel :: Propositional Char -> Maybe (Data.Set.Set Char)
   in
     [
       testProperty
-      ( "For all f: "
-        <> "`fmap (|= f) (findModel f) == fmap (const True) (findModel f)`" )
-        $ \ f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+      ( "Forall f: "
+      <> "`fmap (|= f) (findModel f) == fmap (const True) (findModel f)`" )
+      $ \ f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
     ]
+
+probabilityTheoryQC :: TestTree
+probabilityTheoryQC = testGroup "Probability Theory Identities" $
+  let
+    a = Proposition 'a'
+    b = Proposition 'b'
+    probGT' = probGT :: Probability Char
+                     -> Probability Char
+                     -> Maybe (Data.Set.Set Char)
+  in
+    [
+      testProperty "Forall x, y, and Pr: Pr (x :&&: y) <= Pr (x :&&: y)"
+      $ \ (x :: Propositional Char) y ->
+        Data.Maybe.isNothing
+        $ Pr (x :&&: y) `probGT'` Pr (x :&&: y)
+    , testProperty
+      "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
+      $ \ (x :: Propositional Char) y ->
+        Data.Maybe.isNothing
+        $ (Pr x :+ Pr y) `probGT'` (Pr (x :||: y) :+ Pr (x :&&: y))
+    , testProperty
+      "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
+      $ \ (x :: Propositional Char) y ->
+        Data.Maybe.isNothing
+        $ (Pr x :+ Pr y) `probGT'` (Pr (x :||: y) :+ Pr (x :&&: y))
+    , testCase "Exists Pr s.t. Pr a :+ Pr b > Pr (a :||: b)"
+      $ assert . Data.Maybe.isJust
+        $ (Pr a :+ Pr b) `probGT'` Pr (a :||: b)
+    , testProperty "Forall x, and Pr: 1 <= Pr x :+ Pr (Not x)"
+      $ \ (x :: Propositional Char) ->
+        Data.Maybe.isNothing $ Const 1 `probGT'` (Pr x :+ Pr (Not x))
+    , testProperty "Forall x, and Pr: Pr x :+ Pr (Not x) <= 1"
+      $ \ (x :: Propositional Char) ->
+        Data.Maybe.isNothing $ (Pr x :+ Pr (Not x)) `probGT'` Const 1 
+    ]
+
+propositionalTests :: TestTree
+propositionalTests =
+  testGroup "Propositional Tests" [ propositionalIdentitiesHUnit
+                                  , propositionalSemanticsQC
+                                  , probabilityTheoryQC ]
 
 -- extractPropositionalAtoms :: Ord a => Propositional a -> Set.Set a
 -- extractPropositionalAtoms Verum           = Set.empty
