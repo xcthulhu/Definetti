@@ -19,8 +19,10 @@ library
                      , mtl         >= 2.2 && < 2.3
   default-language:    Haskell2010
   exposed-modules:     Logic.Propositional
+                     , Logic.Probability
                      , Logic.Semantics
-                     , Logic.CNF
+                     , Logic.Propositional.DPLL
+  other-modules:       Logic.Propositional.Tseitin
   ghc-options:         -Wall
 
 executable definetti-shephard

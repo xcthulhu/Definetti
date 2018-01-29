@@ -5,22 +5,21 @@
 module Logic.PropositionalTest (propositionalTests)
 where
 
-import           Control.Applicative   (Alternative, empty, pure)
-import           Control.Monad         (liftM2)
-import qualified Data.Maybe            (isJust, isNothing)
-import           Data.Monoid           ((<>))
-import qualified Data.Set              (Set, filter, map, member)
-import           Logic.CNF             (ConjClause, Literal (Neg, Pos))
-import           Logic.Propositional   ( Propositional (..)
-                                       , Probability (..)
-                                       , probGT )
-import           Logic.Semantics       ( ModelSearch (findModel)
-                                       , Semantics ((|=)))
-import           Test.QuickCheck       ( Arbitrary (arbitrary)
-                                       , Gen, oneof, sized )
-import           Test.Tasty            (TestTree, testGroup)
-import           Test.Tasty.HUnit      (assert, testCase, (@?=))
-import           Test.Tasty.QuickCheck (testProperty)
+import           Control.Applicative      (Alternative, empty, pure)
+import           Control.Monad            (liftM2)
+import qualified Data.Maybe               (isJust, isNothing)
+import           Data.Monoid              ((<>))
+import qualified Data.Set                 (Set, filter, map, member)
+import           Logic.Propositional      (Propositional (..))
+import           Logic.Probability        (Probability (..), ProbabilityInequality (..))
+import           Logic.Propositional.DPLL (ConjClause, Literal (Neg, Pos))
+import           Logic.Semantics          (ModelSearch (findModel),
+                                           Semantics ((|=)))
+import           Test.QuickCheck          (Arbitrary (arbitrary), Gen, oneof,
+                                           sized)
+import           Test.Tasty               (TestTree, testGroup)
+import           Test.Tasty.HUnit         (assert, testCase, (@?=))
+import           Test.Tasty.QuickCheck    (testProperty)
 
 instance Arbitrary p => Arbitrary (Propositional p) where
   arbitrary = sized sizedArbitraryProposition
@@ -62,157 +61,107 @@ instance (Ord p, Alternative f) => ModelSearch f (Data.Set.Set p) (ConjClause p)
         positive (Neg _) = False
 
 propositionalIdentitiesHUnit :: TestTree
-propositionalIdentitiesHUnit = testGroup "Simple Model Search Tests" $
-  let
-    a = Proposition 'a'
-    b = Proposition 'b'
-    c = Proposition 'c'
-    findModel' = findModel :: Propositional Char -> Maybe (Data.Set.Set Char)
-  in
-    [
-      testCase "No m s.t. `m |= (Verum :->: Falsum)`"
-      $ findModel' (Verum :->: Falsum) @?= Nothing
-    , testCase "No m s.t. `m |= Falsum`"
-      $ findModel' Falsum @?= Nothing
-    , testCase "Exists m s.t. `m |= Verum` "
-      $ (assert . Data.Maybe.isJust . findModel') Verum
-    , testCase "Exists m s.t. `m |= a`"
-      $ (assert . Data.Maybe.isJust . findModel') a
-    , testCase "Exists m s.t. `(m |= Not a) && not (m |= a)`"
-      $ fmap (|= a) (findModel' (Not a)) @?= Just False
-    , testCase "Exists m s.t. `(m |= (a :||: b)) && ((m |= a) || (m |= b))`"
-      $ let searchResult = findModel' (a :||: b) in
-         assert ( (fmap (|= a) searchResult == Just True)
-                 || (fmap (|= b) searchResult == Just True) )
-    , testCase ( "Exists m s.t. `(m |= Not (a :||: b)) "
-                <> "&& not (m |= a) && not (m |= b)`" )
-      $ let searchResult = findModel' (Not (a :||: b)) in
-         assert ( (fmap (|= a) searchResult == Just False)
-                 && (fmap (|= b) searchResult == Just False) )
-     , testCase ( "Exists m s.t. `m |= Not (p && q) "
-                 <> "&& (not (m |= a) || not (m |= b))`" )
-       $ let searchResult = findModel' (Not (a :&&: b)) in
-         assert ( (fmap (|= a) searchResult == Just False)
-                 || (fmap (|= b) searchResult == Just False) )
-     , testCase ( "Exists m s.t. `(m |= (a :&&: (b :||: c))) "
-                  <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`" )
-       $ let searchResult = findModel' (a :&&: (b :||: c)) in
-         assert ( (fmap (|= (a :&&: b)) searchResult == Just True)
-                 || (fmap (|= (a :&&: c)) searchResult == Just True) )
-    ]
+propositionalIdentitiesHUnit = testGroup
+  "Simple Model Search Tests"
+  [ testCase "No m s.t. `m |= (Verum :->: Falsum)`"
+  $   findModel' (Verum :->: Falsum)
+  @?= Nothing
+  , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
+  , testCase "Exists m s.t. `m |= Verum` "
+    $ (assert . Data.Maybe.isJust . findModel') Verum
+  , testCase "Exists m s.t. `m |= a`"
+    $ (assert . Data.Maybe.isJust . findModel') a
+  , testCase "Exists m s.t. `(m |= Not a) && not (m |= a)`"
+  $   fmap (|= a) (findModel' (Not a))
+  @?= Just False
+  , testCase "Exists m s.t. `(m |= (a :||: b)) && ((m |= a) || (m |= b))`"
+    $ let searchResult = findModel' (a :||: b)
+      in  assert
+            (  (fmap (|= a) searchResult == Just True)
+            || (fmap (|= b) searchResult == Just True)
+            )
+  , testCase
+      (  "Exists m s.t. `(m |= Not (a :||: b)) "
+      <> "&& not (m |= a) && not (m |= b)`"
+      )
+    $ let searchResult = findModel' (Not (a :||: b))
+      in  assert
+            (  (fmap (|= a) searchResult == Just False)
+            && (fmap (|= b) searchResult == Just False)
+            )
+  , testCase
+      (  "Exists m s.t. `m |= Not (p && q) "
+      <> "&& (not (m |= a) || not (m |= b))`"
+      )
+    $ let searchResult = findModel' (Not (a :&&: b))
+      in  assert
+            (  (fmap (|= a) searchResult == Just False)
+            || (fmap (|= b) searchResult == Just False)
+            )
+  , testCase
+      (  "Exists m s.t. `(m |= (a :&&: (b :||: c))) "
+      <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`"
+      )
+    $ let searchResult = findModel' (a :&&: (b :||: c))
+      in  assert
+            (  (fmap (|= (a :&&: b)) searchResult == Just True)
+            || (fmap (|= (a :&&: c)) searchResult == Just True)
+            )
+  ]
+ where
+  a = Proposition 'a'
+  b = Proposition 'b'
+  c = Proposition 'c'
+  findModel' :: Propositional Char -> Maybe (Data.Set.Set Char)
+  findModel' = findModel
 
 propositionalSemanticsQC :: TestTree
-propositionalSemanticsQC = testGroup "Propositional Semantics Laws" $
-  let
-    findModel' = findModel :: Propositional Char -> Maybe (Data.Set.Set Char)
-  in
-    [
-      testProperty
-      ( "Forall f: "
-      <> "`fmap (|= f) (findModel f) == fmap (const True) (findModel f)`" )
-      $ \ f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
-    ]
+propositionalSemanticsQC = testGroup
+  "Propositional Semantics Laws"
+  [ testProperty
+        "Forall f: `fmap (|= f) (findModel f) == fmap (const True) (findModel f)`"
+      $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+  ]
+ where
+  findModel' :: Propositional Char -> Maybe (Data.Set.Set Char)
+  findModel' = findModel
 
 probabilityTheoryQC :: TestTree
-probabilityTheoryQC = testGroup "Probability Theory Identities" $
-  let
-    a = Proposition 'a'
-    b = Proposition 'b'
-    probGT' = probGT :: Probability Char
-                     -> Probability Char
-                     -> Maybe (Data.Set.Set Char)
-  in
-    [
-      testProperty "Forall x, y, and Pr: Pr (x :&&: y) <= Pr (x :&&: y)"
-      $ \ (x :: Propositional Char) y ->
-        Data.Maybe.isNothing
-        $ Pr (x :&&: y) `probGT'` Pr (x :&&: y)
-    , testProperty
+probabilityTheoryQC = testGroup
+  "Probability Theory Identities"
+  [ testProperty "Forall x, y, and Pr: Pr (x :&&: y) <= Pr (x :&&: y)"
+    $ \(x :: Propositional Char) y -> noModel $ Pr (x :&&: y) :> Pr (x :&&: y)
+  , testProperty
       "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
-      $ \ (x :: Propositional Char) y ->
-        Data.Maybe.isNothing
-        $ (Pr x :+ Pr y) `probGT'` (Pr (x :||: y) :+ Pr (x :&&: y))
-    , testProperty
+    $ \(x :: Propositional Char) y ->
+        noModel $ (Pr x :+ Pr y) :> (Pr (x :||: y) :+ Pr (x :&&: y))
+  , testProperty
       "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
-      $ \ (x :: Propositional Char) y ->
+    $ \(x :: Propositional Char) y ->
         Data.Maybe.isNothing
-        $ (Pr x :+ Pr y) `probGT'` (Pr (x :||: y) :+ Pr (x :&&: y))
-    , testCase "Exists Pr s.t. Pr a :+ Pr b > Pr (a :||: b)"
-      $ assert . Data.Maybe.isJust
-        $ (Pr a :+ Pr b) `probGT'` Pr (a :||: b)
-    , testProperty "Forall x, and Pr: 1 <= Pr x :+ Pr (Not x)"
-      $ \ (x :: Propositional Char) ->
-        Data.Maybe.isNothing $ Const 1 `probGT'` (Pr x :+ Pr (Not x))
-    , testProperty "Forall x, and Pr: Pr x :+ Pr (Not x) <= 1"
-      $ \ (x :: Propositional Char) ->
-        Data.Maybe.isNothing $ (Pr x :+ Pr (Not x)) `probGT'` Const 1 
-    ]
+          .  findModel'
+          $  (Pr x :+ Pr y)
+          :> (Pr (x :||: y) :+ Pr (x :&&: y))
+  , testCase "Exists Pr s.t. Pr a :+ Pr b > Pr (a :||: b)"
+    $ (assert . someModel) ((Pr a :+ Pr b) :> Pr (a :||: b))
+  , testProperty "Forall x, and Pr: 1 <= Pr x :+ Pr (Not x)"
+    $ \(x :: Propositional Char) -> noModel $ Const 1 :> (Pr x :+ Pr (Not x))
+  , testProperty "Forall x, and Pr: Pr x :+ Pr (Not x) <= 1"
+    $ \(x :: Propositional Char) -> noModel $ (Pr x :+ Pr (Not x)) :> Const 1
+  ]
+ where
+  a = Proposition 'a'
+  b = Proposition 'b'
+  findModel' :: ProbabilityInequality Char -> Maybe (Data.Set.Set Char)
+  findModel' = findModel
+  noModel    = Data.Maybe.isNothing . findModel'
+  someModel  = Data.Maybe.isJust . findModel'
 
 propositionalTests :: TestTree
-propositionalTests =
-  testGroup "Propositional Tests" [ propositionalIdentitiesHUnit
-                                  , propositionalSemanticsQC
-                                  , probabilityTheoryQC ]
+propositionalTests = testGroup
+  "Propositional Tests"
+  [propositionalIdentitiesHUnit, propositionalSemanticsQC, probabilityTheoryQC]
 
--- extractPropositionalAtoms :: Ord a => Propositional a -> Set.Set a
--- extractPropositionalAtoms Verum           = Set.empty
--- extractPropositionalAtoms Falsum          = Set.empty
--- extractPropositionalAtoms (Proposition p) = Set.fromList [p]
--- extractPropositionalAtoms (Not x)         = extractPropositionalAtoms x
--- extractPropositionalAtoms (x :&: y)       = unionPropositionalAtoms x y
--- extractPropositionalAtoms (x :|: y)       = unionPropositionalAtoms x y
--- extractPropositionalAtoms (x :->: y)      = unionPropositionalAtoms x y
---
--- unionPropositionalAtoms
---   :: Ord a
---   => Propositional a
---   -> Propositional a
---   -> Set.Set a
--- unionPropositionalAtoms x y =
---   extractPropositionalAtoms x `mappend` extractPropositionalAtoms y
---
--- extractClauseAtoms
---   :: Ord a
---   => Set.Set (Set.Set (Literal (Definitional a)))
---   -> Set.Set a
--- extractClauseAtoms = extractAtoms . Set.toList . unions
---   where
---     unions                     = Set.foldr Set.union Set.empty
---     extractVariable (Pos x) = x
---     extractVariable (Neg x) = x
---     addAtom (Definition _) set = set
---     addAtom (Atom a) set       = Set.insert a set
---     extractAtoms               = foldr (addAtom . extractVariable) Set.empty
---
--- -- | Double turnstyle (models) evaluator
--- (|=) :: Ord a => Set.Set a -> Propositional a -> Bool
--- m |= (Proposition p) = p `Set.member` m
--- m |= (Not f)         = not (m |= f)
--- m |= (a :&: b)       = (m |= a) && (m |= b)
--- m |= (a :|: b)       = (m |= a) || (m |= b)
--- m |= (a :->: b)      = m |= (Not a :|: b)
--- _ |= Verum           = True
--- _ |= Falsum          = False
---
--- extractModelFromDPLLSat :: Ord a => Set.Set (Definitional a) -> Set.Set a
--- extractModelFromDPLLSat = Set.fold addAtom Set.empty
---   where
---     addAtom (Atom a) collectedAtoms       = Set.insert a collectedAtoms
---     addAtom (Definition _) collectedAtoms = collectedAtoms
---
--- test_generativeTseitin :: TestTree
--- test_generativeTseitin = testGroup "Tseitin Generative Tests"
---   [
---     testProperty "Tseitin transformation preserves propositional atoms"
---       $ \(p :: Propositional Char) -> extractPropositionalAtoms p
---               == (extractClauseAtoms . head . definitionalClauses) [p]
---   , testProperty "Models found for clauses for Tseitin transformed proposition satisfy original proposition"
---       $ \(p :: Propositional Char) -> case dpllProposition p of
---                 Nothing -> True
---                 Just m  -> m |= p
---   ]
---
---
 -- interleave :: [a] -> [a] -> [a]
 -- interleave [] ys     = ys
 -- interleave (x:xs) ys = x : interleave ys xs

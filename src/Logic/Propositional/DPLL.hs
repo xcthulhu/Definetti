@@ -2,13 +2,13 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
-module Logic.CNF ( Literal (Pos, Neg)
-                 , Clause
-                 , ConjClause
-                 , DisjClause
-                 , CNF
-                 , maxSat
-                 , maxSatN )
+module Logic.Propositional.DPLL ( Literal (Pos, Neg)
+                                , Clause
+                                , ConjClause
+                                , DisjClause
+                                , CNF
+                                , maxSat
+                                , maxSatN )
 where
 import           Control.Applicative (Alternative, empty, pure, (<|>))
 import           Control.Monad       (MonadPlus, guard, msum)
@@ -59,42 +59,41 @@ data Sequent p = ConjClause p :|-: CNF p
 --    * Every instance of `¬x` is removed from all clauses in B for all `x ∈ L`
 --    * All clauses in `B` containing some `x ∈ L` are removed
 unitPropogate :: Ord p => ConjClause p -> Sequent p -> Sequent p
-unitPropogate literals (assms :|-: clauses) =
-  let
-    resolve = Data.Set.map (\\ Data.Set.map neg literals)
-    filterSatisfied =
-      Data.Set.filter (Data.Set.null . (literals `Data.Set.intersection`))
-  in (literals <> assms) :|-: filterSatisfied (resolve clauses)
+unitPropogate literals (assms:|-:clauses) =
+  let resolve = Data.Set.map (\\ Data.Set.map neg literals)
+      filterSatisfied =
+        Data.Set.filter (Data.Set.null . (literals `Data.Set.intersection`))
+  in  (literals <> assms) :|-: filterSatisfied (resolve clauses)
 
 -- | Pure Rule
 --   A literal is said to be _pure_ in a CNF if all instances have the same sign
 --   (either all `Pos` or all `Neg`).
 --   This rule finds all pure literals and performs unit propogation on them
 pureRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
-pureRule sequent@(_ :|-: clauses) =
+pureRule sequent@(_:|-:clauses) =
   let
     sign (Pos _) = True
     sign (Neg _) = False
     -- Partition the positive and negative formulae
     (positive, negative) = Data.Set.partition sign (Data.Foldable.fold clauses)
     -- Compute the literals that are purely positive/negative
-    purePos = positive \\ Data.Set.map neg negative
-    pureNeg = negative \\ Data.Set.map neg positive
-  in if Data.Set.null purePos && Data.Set.null pureNeg
-     then empty
-     else (pure . unitPropogate (purePos <> pureNeg)) sequent
+    purePos              = positive \\ Data.Set.map neg negative
+    pureNeg              = negative \\ Data.Set.map neg positive
+  in
+    if Data.Set.null purePos && Data.Set.null pureNeg
+      then empty
+      else (pure . unitPropogate (purePos <> pureNeg)) sequent
 
 -- | One Rule
 --   If a clause `{x}` occurs in a CNF, add the clause to the assumptions
 --   and perform unit propogation to eliminate the literal `x`
 oneRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
-oneRule sequent@(_ :|-:  clauses) =
-   let
-     isSingleton c = Data.Set.size c == 1
-     singletons = (Data.Foldable.fold . Data.Set.filter isSingleton) clauses
-   in if null singletons
-      then empty
-      else (pure . unitPropogate singletons) sequent
+oneRule sequent@(_:|-:clauses) =
+  let isSingleton c = Data.Set.size c == 1
+      singletons = (Data.Foldable.fold . Data.Set.filter isSingleton) clauses
+  in  if null singletons
+        then empty
+        else (pure . unitPropogate singletons) sequent
 
 {- Core Search Algorithm -}
 
@@ -137,34 +136,32 @@ choose clauses n k
   | k == 0            = pure []
   | [] <- clauses     = empty
   | k == n            = pure clauses
-  | (x:xs) <- clauses = choose xs n' k <|> fmap (x:) (choose xs n' (k - 1))
-    where n' = n - 1
+  | (x:xs) <- clauses = choose xs n' k <|> fmap (x :) (choose xs n' (k - 1))
+  where n' = n - 1
 
 powerList :: Alternative f => [a] -> f [a]
-powerList xs =
-  Data.Foldable.asum (fmap (choose xs total) [total,total-1..0])
-  where
-    total = length xs
+powerList xs = Data.Foldable.asum
+  (fmap (choose xs total) [total, total - 1 .. 0])
+  where total = length xs
 
 -- | Find the largest sublist of CNFs simultaneously satisfiable from a list
-maxSat :: ( Ord a
-         , MonadPlus m
-         , ModelSearch m model (CNF a) )
-         => [CNF a]
-         -> m ([CNF a], model)
-maxSat = msum
-         . fmap (\cs -> (,) cs <$> (findModel . Data.Foldable.fold) cs)
-         . (powerList :: [a] -> DList [a])
+maxSat
+  :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
+  => [CNF a]
+  -> m ([CNF a], model)
+maxSat =
+  msum
+    . fmap (\cs -> (,) cs <$> (findModel . Data.Foldable.fold) cs)
+    . (powerList :: [a] -> DList [a])
 
 -- | Determine if the largest sublist of CNFs simultaneously satisfiable
 --   has length no bigger than `n`
-maxSatN :: ( Ord a
-          , MonadPlus m
-          , ModelSearch m model (CNF a) )
-          => Int
-          -> [CNF a]
-          -> m model
+maxSatN
+  :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
+  => Int
+  -> [CNF a]
+  -> m model
 maxSatN n = msum . fmap (findModel . Data.Foldable.fold) . chooseN
-  where
-    chooseN :: [a] -> DList [a]
-    chooseN xs = choose xs (length xs) (n + 1)
+ where
+  chooseN :: [a] -> DList [a]
+  chooseN xs = choose xs (length xs) (n + 1)
