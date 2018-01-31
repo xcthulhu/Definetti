@@ -6,14 +6,11 @@ module Logic.Propositional.DPLL ( Literal (Pos, Neg)
                                 , Clause
                                 , ConjClause
                                 , DisjClause
-                                , CNF
-                                , maxSat
-                                , maxSatN )
+                                , CNF)
 where
-import           Control.Applicative (Alternative, empty, pure, (<|>))
+import           Control.Applicative (Alternative, empty, pure)
 import           Control.Monad       (MonadPlus, guard, msum)
-import           Data.DList          (DList)
-import qualified Data.Foldable       (asum, fold)
+import qualified Data.Foldable       (fold)
 import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
@@ -120,48 +117,3 @@ instance ( Ord p
             , return (unitPropogate (Data.Set.singleton x) sequent)
             , return (unitPropogate ((Data.Set.singleton . neg) x) sequent)
             ]
-
-{- ------ MaxSat ------ -}
-
--- TODO: Use ListLike
--- TODO: Use interleave https://mail.haskell.org/pipermail/haskell-cafe/2003-June/004484.html
-
--- | Choose `k` elements of a collection of `n` items
---   Results in `n choose k = n! / (k!(n-k)!)`
---   Lifted into an `Alternative` functor (so DList may be used)
-choose :: Alternative f => [a] -> Int -> Int -> f [a]
-choose clauses n k
-  | k < 0             = empty
-  | k > n             = empty
-  | k == 0            = pure []
-  | [] <- clauses     = empty
-  | k == n            = pure clauses
-  | (x:xs) <- clauses = choose xs n' k <|> fmap (x :) (choose xs n' (k - 1))
-  where n' = n - 1
-
-powerList :: Alternative f => [a] -> f [a]
-powerList xs = Data.Foldable.asum
-  (fmap (choose xs total) [total, total - 1 .. 0])
-  where total = length xs
-
--- | Find the largest sublist of CNFs simultaneously satisfiable from a list
-maxSat
-  :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
-  => [CNF a]
-  -> m ([CNF a], model)
-maxSat =
-  msum
-    . fmap (\cs -> (,) cs <$> (findModel . Data.Foldable.fold) cs)
-    . (powerList :: [a] -> DList [a])
-
--- | Determine if the largest sublist of CNFs simultaneously satisfiable
---   has length no bigger than `n`
-maxSatN
-  :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
-  => Int
-  -> [CNF a]
-  -> m model
-maxSatN n = msum . fmap (findModel . Data.Foldable.fold) . chooseN
- where
-  chooseN :: [a] -> DList [a]
-  chooseN xs = choose xs (length xs) (n + 1)

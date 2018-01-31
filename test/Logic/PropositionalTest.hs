@@ -10,8 +10,9 @@ import           Control.Monad            (liftM2)
 import qualified Data.Maybe               (isJust, isNothing)
 import           Data.Monoid              ((<>))
 import qualified Data.Set                 (Set, filter, map, member)
+import           Logic.Probability        (Probability (..),
+                                           ProbabilityInequality (..))
 import           Logic.Propositional      (Propositional (..))
-import           Logic.Probability        (Probability (..), ProbabilityInequality (..))
 import           Logic.Propositional.DPLL (ConjClause, Literal (Neg, Pos))
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
@@ -64,8 +65,7 @@ propositionalIdentitiesHUnit :: TestTree
 propositionalIdentitiesHUnit = testGroup
   "Simple Model Search Tests"
   [ testCase "No m s.t. `m |= (Verum :->: Falsum)`"
-  $   findModel' (Verum :->: Falsum)
-  @?= Nothing
+  $   findModel' (Verum :->: Falsum) @?= Nothing
   , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
   , testCase "Exists m s.t. `m |= Verum` "
     $ (assert . Data.Maybe.isJust . findModel') Verum
@@ -119,7 +119,8 @@ propositionalSemanticsQC :: TestTree
 propositionalSemanticsQC = testGroup
   "Propositional Semantics Laws"
   [ testProperty
-        "Forall f: `fmap (|= f) (findModel f) == fmap (const True) (findModel f)`"
+        ( "Forall f: `fmap (|= f) (findModel f)"
+         <> " == fmap (const True) (findModel f)`")
       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
   ]
  where
@@ -130,24 +131,31 @@ probabilityTheoryQC :: TestTree
 probabilityTheoryQC = testGroup
   "Probability Theory Identities"
   [ testProperty "Forall x, y, and Pr: Pr (x :&&: y) <= Pr (x :&&: y)"
-    $ \(x :: Propositional Char) y -> noModel $ Pr (x :&&: y) :> Pr (x :&&: y)
+    $ \x y -> noModel $ Pr (x :&&: y) :> Pr (x :&&: y)
   , testProperty
       "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
-    $ \(x :: Propositional Char) y ->
+    $ \x y ->
         noModel $ (Pr x :+ Pr y) :> (Pr (x :||: y) :+ Pr (x :&&: y))
   , testProperty
-      "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
-    $ \(x :: Propositional Char) y ->
-        Data.Maybe.isNothing
-          .  findModel'
-          $  (Pr x :+ Pr y)
-          :> (Pr (x :||: y) :+ Pr (x :&&: y))
+      "Forall x, y, and Pr: Pr x :+ Pr y >= Pr (x :||: y) :+ Pr (x :&&: y)"
+    $ \x y -> noModel $ (Pr x :+ Pr y) :< (Pr (x :||: y) :+ Pr (x :&&: y))
   , testCase "Exists Pr s.t. Pr a :+ Pr b > Pr (a :||: b)"
     $ (assert . someModel) ((Pr a :+ Pr b) :> Pr (a :||: b))
-  , testProperty "Forall x, and Pr: 1 <= Pr x :+ Pr (Not x)"
-    $ \(x :: Propositional Char) -> noModel $ Const 1 :> (Pr x :+ Pr (Not x))
-  , testProperty "Forall x, and Pr: Pr x :+ Pr (Not x) <= 1"
-    $ \(x :: Propositional Char) -> noModel $ (Pr x :+ Pr (Not x)) :> Const 1
+  , testCase "Exists Pr s.t. 0.5 > Pr (a :||: b)"
+    $ (assert . someModel) (Const 0.5 :> Pr (a :||: b))
+  , testProperty "Forall x and Pr: 1 <= Pr x :+ Pr (Not x)"
+    $ \x -> noModel $ Const 1 :> (Pr x :+ Pr (Not x))
+  , testProperty "Forall x and Pr: Pr x :+ Pr (Not x) <= 1"
+    $ \x -> noModel $ (Pr x :+ Pr (Not x)) :> Const 1
+  , testProperty (  "Forall x, y, z, and Pr:"
+                 <> " 2*Pr x <="
+                 <> " Pr (y :->: (z :&&: x))"
+                 <> " :+ Pr (z :->: (y :&&: x))"
+                 <> " :+ Pr ((z :&&: x) :||: (y :&&: x))")
+    $ \x y z -> noModel
+    $ (Pr x :+ Pr x) :> (    Pr (y :->: (z :&&: x))
+                          :+ Pr (z :->: (y :&&: x))
+                          :+ Pr ((z :&&: x) :||: (y :&&: x)))
   ]
  where
   a = Proposition 'a'
@@ -161,83 +169,3 @@ propositionalTests :: TestTree
 propositionalTests = testGroup
   "Propositional Tests"
   [propositionalIdentitiesHUnit, propositionalSemanticsQC, probabilityTheoryQC]
-
--- interleave :: [a] -> [a] -> [a]
--- interleave [] ys     = ys
--- interleave (x:xs) ys = x : interleave ys xs
---
--- subLists :: [a] -> [[a]]
--- subLists [] = [[]]
--- subLists (x:xs) = let powerXs = subLists xs in powerXs `interleave` map (x:) powerXs
---
--- findLargerSubLists :: Int -> [a] -> [[a]]
--- findLargerSubLists n xs = filter (\x -> length x > n) (subLists xs)
---
--- maxSatN
---   :: (Ord p, MonadPlus m)
---   => Int
---   -> [Set.Set (Clause p)]
---   -> m (Set.Set p)
--- maxSatN n clausesList =
---   if n <= 0
---   then mzero
---   else msum ( map (dpll . Set.unions) (findLargerSubLists n clausesList) )
---
--- data ProbabilityInequality a = ProbabilityExpression a :<= ProbabilityExpression a
--- data ProbabilityExpression a = Constant Double
---                              | Probability (Propositional a)
---                              | ProbabilityExpression a :+ ProbabilityExpression a
---
--- extractConstantTerm :: ProbabilityExpression a -> Double
--- extractConstantTerm (Constant x) = x
--- extractConstantTerm (Probability _) = 0
--- extractConstantTerm (a :+ b) = extractConstantTerm a + extractConstantTerm b
---
--- extractPropositions :: ProbabilityExpression a -> [Propositional a]
--- extractPropositions (Constant _) = mempty
--- extractPropositions (Probability x) = return x
--- extractPropositions (a :+ b) = extractPropositions a `mappend` extractPropositions b
---
--- disproveProbabilityInequality
---   :: (Ord a, MonadPlus m)
---   => ProbabilityInequality a
---   -> m (Set.Set a)
--- disproveProbabilityInequality (leftHandSide :<= rightHandSide) =
---   fmap extractModelFromDPLLSat ( maxSatN adjustedRightHandLength clauses )
---   where
---     leftHandPropositions    = extractPropositions leftHandSide
---     rightHandPropositions   = extractPropositions rightHandSide
---     rightHandLength         = length rightHandPropositions
---     adjustedRightHandLength = floor (  fromIntegral rightHandLength
---                                      + extractConstantTerm rightHandSide
---                                      - extractConstantTerm leftHandSide)
---     clauses = definitionalClauses (fmap Not rightHandPropositions `mappend` leftHandPropositions)
---
--- test_probabilityTheory :: TestTree
--- test_probabilityTheory = testGroup "Probability Theory Identities"
---    [
---      testProperty "⊢ ∀ϕ. ∀ψ. Pr ϕ + Pr ψ ≤ Pr (ϕ∨ψ) + Pr (ϕ∧ψ)"
---      $ \(p :: Propositional Char) q ->
---        Data.Maybe.isNothing
---        $ disproveProbabilityInequality
---          ((Probability p :+ Probability q ) :<= (Probability (p :|: q) :+ Probability (p :&: q)))
---    , testProperty "⊢ ∀ϕ. ∀ψ. Pr (ϕ ∨ ψ) + Pr (ϕ ∧ ψ) ≤ Pr ϕ + Pr ψ"
---      $ \(p :: Propositional Char) q ->
---        Data.Maybe.isNothing
---        $ disproveProbabilityInequality
---          ((Probability (p :|: q) :+ Probability (p :&: q)) :<= (Probability p :+ Probability q))
---    , testProperty "⊢ ∀ϕ. 0.5 ≤ Pr ϕ + Pr (¬ ϕ)"
---      $ \(p :: Propositional Char) ->
---        Data.Maybe.isNothing
---        $ disproveProbabilityInequality
---          (Constant 0.05 :<= (Probability p :+ Probability (Not p)))
---    , testProperty "⊢ ∀ϕ. ∀ψ. ∀ξ. 2 ⨉ Pr ϕ ≤ Pr (¬ (ψ ∧ (ξ -> ¬ ϕ))) + Pr (¬ (ξ ∧ (ψ -> ¬ ϕ))) + Pr (¬ ((ψ -> ¬ ϕ) ∧ (ξ -> ¬ ϕ)))"
---      $ \(p :: Propositional Char) q r ->
---        Data.Maybe.isNothing
---        $ disproveProbabilityInequality
---          ((Probability p :+ Probability p)
---           :<= (   Probability (Not (q :&: (r :->: Not p)))
---                :+ Probability (Not (r :&: (q :->: Not p)))
---                :+ Probability (Not ((r :->: Not p) :&: (q :->: Not p)))))
---    ]
-

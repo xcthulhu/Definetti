@@ -1,20 +1,18 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 module Logic.Propositional.Tseitin ( Propositional (..)
-                                   , Probability (..)
-                                   , probGT
                                    , tseitinTransform)
 where
-import           Control.Monad   (MonadPlus)
-import           Data.Monoid     (mempty, (<>))
-import qualified Data.Set        (Set, insert, singleton)
-import           Logic.Propositional.DPLL
-                                 (CNF, Clause, ConjClause, Literal (Neg, Pos),
-                                  maxSatN)
-import           Logic.Semantics (ModelSearch (findModel), Semantics ((|=)))
+import           Control.Monad            (MonadPlus)
+import           Data.Monoid              (mempty, (<>))
+import qualified Data.Set                 (Set, insert, singleton)
+import           Logic.Propositional.DPLL (CNF, Clause, ConjClause,
+                                           Literal (Neg, Pos))
+import           Logic.Semantics          (ModelSearch (findModel),
+                                           Semantics ((|=)))
 
 -- | Formulae of the Propositional Calculus
 infixr 8 :->:
@@ -157,37 +155,3 @@ instance ( Ord p
          => ModelSearch m model (Propositional p)
   where
     findModel = findModel . tseitinTransform
-
--- | Probability Inequalities
-
-data Probability p = Pr (Propositional p)
-                   | Const Double
-                   | (Probability p) :+ (Probability p)
-
-extractPropositions :: Probability p -> [Propositional p]
-extractPropositions (Pr    p) = [p]
-extractPropositions (Const _) = []
-extractPropositions (x:+y   ) = extractPropositions x ++ extractPropositions y
-
-extractConstantTerm :: Probability p -> Double
-extractConstantTerm (Pr    _) = 0
-extractConstantTerm (Const d) = d
-extractConstantTerm (x:+y   ) = extractConstantTerm x + extractConstantTerm y
-
-probGT
-  :: (Ord p, MonadPlus m, ModelSearch m model (ConjClause p))
-  => Probability p
-  -> Probability p
-  -> m model
-probGT leftHandSide rightHandSide = maxSatN capacity clauses
- where
-  leftHandPropositions = extractPropositions leftHandSide
-  rightHandPropositions = extractPropositions rightHandSide
-  clauses = fmap tseitinTransform
-                 (fmap Not rightHandPropositions ++ leftHandPropositions)
-  capacity = floor
-    ( fromIntegral (length rightHandPropositions)
-    + extractConstantTerm rightHandSide
-    - extractConstantTerm leftHandSide
-    )
-
