@@ -32,7 +32,7 @@ type DisjClause a = Clause a
 -- | Conjunctive Normal Form
 type CNF a = Data.Set.Set (DisjClause a)
 
--- | Semantics for CNF
+-- | Semantics for CNF (note that Clause is ambiguous!)
 instance Semantics model (Clause a) => Semantics model (CNF a) where
   (|=) m = all (any ((m |=) . Data.Set.singleton))
 

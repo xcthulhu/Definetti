@@ -65,7 +65,8 @@ propositionalIdentitiesHUnit :: TestTree
 propositionalIdentitiesHUnit = testGroup
   "Simple Model Search Tests"
   [ testCase "No m s.t. `m |= (Verum :->: Falsum)`"
-  $   findModel' (Verum :->: Falsum) @?= Nothing
+  $   findModel' (Verum :->: Falsum)
+  @?= Nothing
   , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
   , testCase "Exists m s.t. `m |= Verum` "
     $ (assert . Data.Maybe.isJust . findModel') Verum
@@ -119,8 +120,9 @@ propositionalSemanticsQC :: TestTree
 propositionalSemanticsQC = testGroup
   "Propositional Semantics Laws"
   [ testProperty
-        ( "Forall f: `fmap (|= f) (findModel f)"
-         <> " == fmap (const True) (findModel f)`")
+        (  "Forall f: `fmap (|= f) (findModel f)"
+        <> " == fmap (const True) (findModel f)`"
+        )
       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
   ]
  where
@@ -134,8 +136,7 @@ probabilityTheoryQC = testGroup
     $ \x y -> noModel $ Pr (x :&&: y) :> Pr (x :&&: y)
   , testProperty
       "Forall x, y, and Pr: Pr x :+ Pr y <= Pr (x :||: y) :+ Pr (x :&&: y)"
-    $ \x y ->
-        noModel $ (Pr x :+ Pr y) :> (Pr (x :||: y) :+ Pr (x :&&: y))
+    $ \x y -> noModel $ (Pr x :+ Pr y) :> (Pr (x :||: y) :+ Pr (x :&&: y))
   , testProperty
       "Forall x, y, and Pr: Pr x :+ Pr y >= Pr (x :||: y) :+ Pr (x :&&: y)"
     $ \x y -> noModel $ (Pr x :+ Pr y) :< (Pr (x :||: y) :+ Pr (x :&&: y))
@@ -147,15 +148,19 @@ probabilityTheoryQC = testGroup
     $ \x -> noModel $ Const 1 :> (Pr x :+ Pr (Not x))
   , testProperty "Forall x and Pr: Pr x :+ Pr (Not x) <= 1"
     $ \x -> noModel $ (Pr x :+ Pr (Not x)) :> Const 1
-  , testProperty (  "Forall x, y, z, and Pr:"
-                 <> " 2*Pr x <="
-                 <> " Pr (y :->: (z :&&: x))"
-                 <> " :+ Pr (z :->: (y :&&: x))"
-                 <> " :+ Pr ((z :&&: x) :||: (y :&&: x))")
-    $ \x y z -> noModel
-    $ (Pr x :+ Pr x) :> (    Pr (y :->: (z :&&: x))
-                          :+ Pr (z :->: (y :&&: x))
-                          :+ Pr ((z :&&: x) :||: (y :&&: x)))
+  , testProperty
+      (  "Forall x, y, z, and Pr:"
+      <> " 2*Pr x <="
+      <> " Pr (y :->: (z :&&: x))"
+      <> " :+ Pr (z :->: (y :&&: x))"
+      <> " :+ Pr ((z :&&: x) :||: (y :&&: x))"
+      )
+    $ \x y z ->
+        noModel
+          $  (Pr x :+ Pr x)
+          :> ( Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr
+               ((z :&&: x) :||: (y :&&: x))
+             )
   ]
  where
   a = Proposition 'a'

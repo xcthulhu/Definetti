@@ -5,9 +5,8 @@
 module Logic.Probability ( Probability (..)
                          , ProbabilityInequality (..))
 where
-import           Control.Applicative         (Alternative, empty, pure, (<|>))
+import           Control.Applicative         (empty, pure)
 import           Control.Monad               (MonadPlus, msum)
-import           Data.DList                  (DList)
 import qualified Data.Foldable               (fold)
 import           Logic.Propositional         (Propositional (Not))
 import           Logic.Propositional.DPLL    (CNF, Clause, ConjClause)
@@ -43,20 +42,22 @@ extractConstantTerm (Pr    _) = 0
 extractConstantTerm (Const d) = d
 extractConstantTerm (x:+y   ) = extractConstantTerm x + extractConstantTerm y
 
--- TODO: Use ListLike
--- TODO: Use interleave https://mail.haskell.org/pipermail/haskell-cafe/2003-June/004484.html
+-- https://mail.haskell.org/pipermail/haskell-cafe/2003-June/004484.html
+(/\/)        :: [a] -> [a] -> [a]
+[]     /\/ ys = ys
+(x:xs) /\/ ys = x : (ys /\/ xs)
 
 -- | Choose `k` elements of a collection of `n` items
 --   Results in `n choose k = n! / (k!(n-k)!)`
 --   Lifted into an `Alternative` functor (so DList may be used)
-choose :: Alternative f => [a] -> Int -> Int -> f [a]
+choose :: [a] -> Int -> Int -> [[a]]
 choose clauses n k
   | k < 0             = empty
   | k > n             = empty
   | k == 0            = pure []
   | [] <- clauses     = empty
   | k == n            = pure clauses
-  | (x:xs) <- clauses = choose xs n' k <|> fmap (x :) (choose xs n' (k - 1))
+  | (x:xs) <- clauses = choose xs n' k /\/ fmap (x :) (choose xs n' (k - 1))
   where n' = n - 1
 
 -- powerList :: Alternative f => [a] -> f [a]
@@ -83,7 +84,6 @@ maxSatN
   -> m model
 maxSatN n = msum . fmap (findModel . Data.Foldable.fold) . chooseN
  where
-  chooseN :: [a] -> DList [a]
   chooseN xs = choose xs (length xs) (n + 1)
 
 instance ( Ord p
