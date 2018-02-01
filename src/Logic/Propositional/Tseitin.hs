@@ -3,16 +3,19 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
-module Logic.Propositional.Tseitin ( Propositional (..)
-                                   , tseitinTransform)
-where
+
+module Logic.Propositional.Tseitin
+  ( Propositional (..)
+  , tseitinTransform
+  ) where
+
 import           Control.Monad            (MonadPlus)
 import           Data.Monoid              (mempty, (<>))
 import qualified Data.Set                 (Set, insert, singleton)
-import           Logic.Propositional.DPLL (CNF, Clause, ConjClause,
-                                           Literal (Neg, Pos))
+import           Logic.Propositional.DPLL (CNF, Clause, ConjClause, Literal (Neg, Pos))
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
+
 
 -- | Formulae of the Propositional Calculus
 infixr 8 :->:

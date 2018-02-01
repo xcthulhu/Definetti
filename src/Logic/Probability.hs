@@ -1,10 +1,14 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE UndecidableInstances  #-}
-module Logic.Probability ( Probability (..)
-                         , ProbabilityInequality (..))
-where
+
+module Logic.Probability
+  ( Probability (..)
+  , ProbabilityInequality (..)
+  ) where
+
 import           Control.Applicative         (empty, pure)
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)

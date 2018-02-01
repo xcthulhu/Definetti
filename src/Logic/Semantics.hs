@@ -1,5 +1,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Logic.Semantics (Semantics ((|=)), ModelSearch (findModel)) where
+
+module Logic.Semantics
+  ( Semantics ((|=))
+  , ModelSearch (findModel)
+  ) where
+
 
 -- | Truth-functional semantics
 class Semantics model formula where

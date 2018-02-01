@@ -5,6 +5,7 @@ import           Language.Haskell.HLint3 (hlint)
 import           System.Environment      (getArgs)
 import           System.Exit             (exitFailure)
 
+
 main :: IO ()
 main = do
   args  <- getArgs

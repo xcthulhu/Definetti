@@ -1,3 +1,3 @@
-module Logic.Propositional (Propositional (..))
-where
-import           Logic.Propositional.Tseitin
+module Logic.Propositional (Propositional (..)) where
+
+import Logic.Propositional.Tseitin

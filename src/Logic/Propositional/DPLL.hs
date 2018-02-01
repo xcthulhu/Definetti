@@ -1,13 +1,17 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
-module Logic.Propositional.DPLL ( Literal (Pos, Neg)
-                                , Clause
-                                , ConjClause
-                                , DisjClause
-                                , CNF)
-where
+
+module Logic.Propositional.DPLL
+  ( Literal (Pos, Neg)
+  , Clause
+  , ConjClause
+  , DisjClause
+  , CNF
+  ) where
+
 import           Control.Applicative (Alternative, empty, pure)
 import           Control.Monad       (MonadPlus, guard, msum)
 import qualified Data.Foldable       (fold)
@@ -16,6 +20,7 @@ import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
                                       null, partition, singleton, size, toList)
 import           Logic.Semantics     (ModelSearch (findModel), Semantics ((|=)))
+
 
 -- | Definitional Literals for Definitional Conjunctive Normal Form
 data Literal a = Pos a | Neg a deriving (Ord, Show, Eq)
