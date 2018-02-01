@@ -19,7 +19,7 @@ import           Logic.Semantics          (ModelSearch (findModel),
 import           Test.QuickCheck          (Arbitrary (arbitrary), Gen, oneof,
                                            sized)
 import           Test.Tasty               (TestTree, testGroup)
-import           Test.Tasty.HUnit         (assert, testCase, (@?=))
+import           Test.Tasty.HUnit         (testCase, (@?=))
 import           Test.Tasty.QuickCheck    (testProperty)
 
 instance Arbitrary p => Arbitrary (Propositional p) where
@@ -69,15 +69,15 @@ propositionalIdentitiesHUnit = testGroup
   @?= Nothing
   , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
   , testCase "Exists m s.t. `m |= Verum` "
-    $ (assert . Data.Maybe.isJust . findModel') Verum
+    $ ((True @?=) . Data.Maybe.isJust . findModel') Verum
   , testCase "Exists m s.t. `m |= a`"
-    $ (assert . Data.Maybe.isJust . findModel') a
+    $ ((True @?=) . Data.Maybe.isJust . findModel') a
   , testCase "Exists m s.t. `(m |= Not a) && not (m |= a)`"
   $   fmap (|= a) (findModel' (Not a))
   @?= Just False
   , testCase "Exists m s.t. `(m |= (a :||: b)) && ((m |= a) || (m |= b))`"
     $ let searchResult = findModel' (a :||: b)
-      in  assert
+      in  (True @?=)
             (  (fmap (|= a) searchResult == Just True)
             || (fmap (|= b) searchResult == Just True)
             )
@@ -86,7 +86,7 @@ propositionalIdentitiesHUnit = testGroup
       <> "&& not (m |= a) && not (m |= b)`"
       )
     $ let searchResult = findModel' (Not (a :||: b))
-      in  assert
+      in  (True @?=)
             (  (fmap (|= a) searchResult == Just False)
             && (fmap (|= b) searchResult == Just False)
             )
@@ -95,7 +95,7 @@ propositionalIdentitiesHUnit = testGroup
       <> "&& (not (m |= a) || not (m |= b))`"
       )
     $ let searchResult = findModel' (Not (a :&&: b))
-      in  assert
+      in  (True @?=)
             (  (fmap (|= a) searchResult == Just False)
             || (fmap (|= b) searchResult == Just False)
             )
@@ -104,7 +104,7 @@ propositionalIdentitiesHUnit = testGroup
       <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`"
       )
     $ let searchResult = findModel' (a :&&: (b :||: c))
-      in  assert
+      in  (True @?=)
             (  (fmap (|= (a :&&: b)) searchResult == Just True)
             || (fmap (|= (a :&&: c)) searchResult == Just True)
             )
@@ -141,9 +141,9 @@ probabilityTheoryQC = testGroup
       "Forall x, y, and Pr: Pr x :+ Pr y >= Pr (x :||: y) :+ Pr (x :&&: y)"
     $ \x y -> noModel $ (Pr x :+ Pr y) :< (Pr (x :||: y) :+ Pr (x :&&: y))
   , testCase "Exists Pr s.t. Pr a :+ Pr b > Pr (a :||: b)"
-    $ (assert . someModel) ((Pr a :+ Pr b) :> Pr (a :||: b))
+    $ ((True @?=) . someModel) ((Pr a :+ Pr b) :> Pr (a :||: b))
   , testCase "Exists Pr s.t. 0.5 > Pr (a :||: b)"
-    $ (assert . someModel) (Const 0.5 :> Pr (a :||: b))
+    $ ((True @?=) . someModel) (Const 0.5 :> Pr (a :||: b))
   , testProperty "Forall x and Pr: 1 <= Pr x :+ Pr (Not x)"
     $ \x -> noModel $ Const 1 :> (Pr x :+ Pr (Not x))
   , testProperty "Forall x and Pr: Pr x :+ Pr (Not x) <= 1"
