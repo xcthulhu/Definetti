@@ -40,6 +40,26 @@ instance Arbitrary p => Arbitrary (Propositional p) where
         where
           halfSizeSubFormula = sizedArbitraryProposition (n `div` 2)
 
+instance Arbitrary p => Arbitrary (Probability p) where
+  arbitrary = sized sizedProbability
+    where
+      sizedProbability :: Arbitrary p => Int -> Gen (Probability p)
+      sizedProbability n
+        | n <= 0 = fmap Pr arbitrary
+        | otherwise =
+          oneof [ fmap Pr arbitrary
+                , fmap Const arbitrary
+                , liftM2 (:+) halfSizeSubFormula halfSizeSubFormula]
+        where
+          halfSizeSubFormula = sizedProbability (n `div` 2)
+
+instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
+  arbitrary = oneof [ liftM2 (:>) arbitrary arbitrary
+                    , liftM2 (:<) arbitrary arbitrary
+                    -- , liftM2 (:<=) arbitrary arbitrary
+                    -- , liftM2 (:>=) arbitrary arbitrary
+                    ]
+
 instance Ord p => Semantics (Data.Set.Set p) (ConjClause p) where
   (|=) m = all checkSatisfied
     where
@@ -155,12 +175,11 @@ probabilityTheoryQC = testGroup
       <> " :+ Pr (z :->: (y :&&: x))"
       <> " :+ Pr ((z :&&: x) :||: (y :&&: x))"
       )
-    $ \x y z ->
-        noModel
-          $  (Pr x :+ Pr x)
-          :> ( Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr
-               ((z :&&: x) :||: (y :&&: x))
-             )
+    $ \x y z -> noModel
+          $  (Pr x :+ Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((z :&&: x) :||: (y :&&: x)))
+  , testProperty "Forall x and Pr: -2 <= Pr x" $ \x -> noModel (Const (-2) :> Pr x)
+  , testCase "Exists a model where 5 > 0" $ True @?= someModel (Const 5 :> Const 0)
+  , testCase "For all models: not (0 > 5)" $ True @?= noModel (Const 0 :> Const 5)
   ]
  where
   a = Proposition 'a'
@@ -170,7 +189,24 @@ probabilityTheoryQC = testGroup
   noModel    = Data.Maybe.isNothing . findModel'
   someModel  = Data.Maybe.isJust . findModel'
 
+probabilityInequalitySemanticsQC :: TestTree
+probabilityInequalitySemanticsQC = testGroup
+  "Probability Semantics Laws"
+  [ testProperty
+        (  "Forall f: `fmap (|= f) (findModel f)"
+        <> " == fmap (const True) (findModel f)`"
+        )
+      $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+  ]
+ where
+  findModel' :: ProbabilityInequality Char -> Maybe (Data.Set.Set Char)
+  findModel' = findModel
+
 propositionalTests :: TestTree
 propositionalTests = testGroup
   "Propositional Tests"
-  [propositionalIdentitiesHUnit, propositionalSemanticsQC, probabilityTheoryQC]
+  [ propositionalIdentitiesHUnit
+  , propositionalSemanticsQC
+  , probabilityTheoryQC
+  , probabilityInequalitySemanticsQC
+  ]

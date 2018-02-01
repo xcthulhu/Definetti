@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MonoLocalBinds        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 module Logic.Probability
@@ -23,18 +23,25 @@ import           Logic.Semantics             (ModelSearch (findModel),
 data Probability p = Pr (Propositional p)
                    | Const Double
                    | (Probability p) :+ (Probability p)
+                   deriving (Ord, Show, Eq)
 
-data ProbabilityInequality p = (Probability p) :< (Probability p)
-                             | (Probability p) :> (Probability p)
+data ProbabilityInequality p = (Probability p) :<  (Probability p)
+                             | (Probability p) :>  (Probability p)
+                             | (Probability p) :>= (Probability p)
+                             | (Probability p) :<= (Probability p)
+                             deriving (Ord, Show, Eq)
+
+evalProbability :: Semantics model (Clause p) => model -> Probability p -> Double
+evalProbability _ (Const c) = c
+evalProbability m (Pr p)    = if m |= p then 1 else 0
+evalProbability m (x :+ y)  = evalProbability m x + evalProbability m y
 
 instance Semantics model (Clause p) =>
          Semantics model (ProbabilityInequality p) where
-  m |= (a :< b) = m |= (b :> a)
-  m |= (a :> b) = evalProbability a > evalProbability b
-    where
-      evalProbability (Const c) = c
-      evalProbability (Pr p)    = if m |= p then 1 else 0
-      evalProbability (x :+ y)  = evalProbability x + evalProbability y
+  m |= (a :< b)  = evalProbability m a <  evalProbability m b
+  m |= (a :<= b) = evalProbability m a <= evalProbability m b
+  m |= (a :>= b) = evalProbability m a >= evalProbability m b
+  m |= (a :> b)  = evalProbability m a >  evalProbability m b
 
 extractPropositions :: Probability p -> [Propositional p]
 extractPropositions (Pr    p) = [p]
@@ -56,28 +63,12 @@ extractConstantTerm (x:+y   ) = extractConstantTerm x + extractConstantTerm y
 --   Lifted into an `Alternative` functor (so DList may be used)
 choose :: [a] -> Int -> Int -> [[a]]
 choose clauses n k
-  | k < 0             = empty
   | k > n             = empty
-  | k == 0            = pure []
-  | [] <- clauses     = empty
+  | k <= 0            = pure []
   | k == n            = pure clauses
+  | [] <- clauses     = error "This should never happen"
   | (x:xs) <- clauses = choose xs n' k /\/ fmap (x :) (choose xs n' (k - 1))
   where n' = n - 1
-
--- powerList :: Alternative f => [a] -> f [a]
--- powerList xs = Data.Foldable.asum
---   (fmap (choose xs total) [total, total - 1 .. 0])
---   where total = length xs
-
--- -- | Find the largest sublist of CNFs simultaneously satisfiable from a list
--- maxSat
---   :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
---   => [CNF a]
---   -> m ([CNF a], model)
--- maxSat =
---   msum
---     . fmap (\cs -> (,) cs <$> (findModel . Data.Foldable.fold) cs)
---     . (powerList :: [a] -> DList [a])
 
 -- | Determine if the largest sublist of CNFs simultaneously satisfiable
 --   has length no bigger than `n`
@@ -86,23 +77,25 @@ maxSatN
   => Int
   -> [CNF a]
   -> m model
-maxSatN n = msum . fmap (findModel . Data.Foldable.fold) . chooseN
+maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
  where
-  chooseN xs = choose xs (length xs) (n + 1)
+  chooseN xs = choose xs (length xs) (k + 1)
 
 instance ( Ord p
          , MonadPlus m
          , ModelSearch m model (ConjClause p) )
          => ModelSearch m model (ProbabilityInequality p)
   where
-    findModel (a :< b) = findModel (b :> a)
-    findModel (b :> a) = maxSatN capacity clauses
+    findModel (a :< b)  = findModel (b :> a)
+    findModel (a :>= b) = findModel (b :<= a)
+    findModel (b :<= a) = findModel (b :< (a :+ Const 1))
+    findModel (b :> a)  = maxSatN k clauses
      where
         leftHandPropositions = extractPropositions b
         rightHandPropositions = extractPropositions a
         clauses = fmap tseitinTransform
                        (fmap Not rightHandPropositions ++ leftHandPropositions)
-        capacity = floor
+        k = floor
           ( fromIntegral (length rightHandPropositions)
           + extractConstantTerm a
           - extractConstantTerm b)
