@@ -7,12 +7,14 @@
 module Logic.Propositional.Tseitin
   ( Propositional (..)
   , tseitinTransform
+  , Definitional
   ) where
 
 import           Control.Monad            (MonadPlus)
 import           Data.Monoid              (mempty, (<>))
 import qualified Data.Set                 (Set, insert, singleton)
-import           Logic.Propositional.DPLL (CNF, Clause, ConjClause, Literal (Neg, Pos))
+import           Logic.Propositional.DPLL (CNF, Clause, ConjClause,
+                                           Literal (Neg, Pos))
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
 

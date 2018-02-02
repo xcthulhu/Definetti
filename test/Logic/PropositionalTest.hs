@@ -56,8 +56,8 @@ instance Arbitrary p => Arbitrary (Probability p) where
 instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
   arbitrary = oneof [ liftM2 (:>) arbitrary arbitrary
                     , liftM2 (:<) arbitrary arbitrary
-                    -- , liftM2 (:<=) arbitrary arbitrary
-                    -- , liftM2 (:>=) arbitrary arbitrary
+                    , liftM2 (:<=) arbitrary arbitrary
+                    , liftM2 (:>=) arbitrary arbitrary
                     ]
 
 instance Ord p => Semantics (Data.Set.Set p) (ConjClause p) where
@@ -173,13 +173,15 @@ probabilityTheoryQC = testGroup
       <> " 2*Pr x <="
       <> " Pr (y :->: (z :&&: x))"
       <> " :+ Pr (z :->: (y :&&: x))"
-      <> " :+ Pr ((z :&&: x) :||: (y :&&: x))"
+      <> " :+ Pr ((y :&&: x) :||: (z :&&: x))"
       )
     $ \x y z -> noModel
-          $  (Pr x :+ Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((z :&&: x) :||: (y :&&: x)))
+          $  (Pr x :+ Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((y :&&: x) :||: (z :&&: x)))
   , testProperty "Forall x and Pr: -2 <= Pr x" $ \x -> noModel (Const (-2) :> Pr x)
   , testCase "Exists a model where 5 > 0" $ True @?= someModel (Const 5 :> Const 0)
   , testCase "For all models: not (0 > 5)" $ True @?= noModel (Const 0 :> Const 5)
+  , testCase "For all models: not (-4.2 <= -4.8)" $
+    True @?= noModel (Const (-4.3) :<= Const (-4.8))
   ]
  where
   a = Proposition 'a'
