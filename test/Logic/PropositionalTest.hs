@@ -180,8 +180,12 @@ probabilityTheoryQC = testGroup
   , testProperty "Forall x and Pr: -2 <= Pr x" $ \x -> noModel (Const (-2) :> Pr x)
   , testCase "Exists a model where 5 > 0" $ True @?= someModel (Const 5 :> Const 0)
   , testCase "For all models: not (0 > 5)" $ True @?= noModel (Const 0 :> Const 5)
-  , testCase "For all models: not (-4.2 <= -4.8)" $
-    True @?= noModel (Const (-4.3) :<= Const (-4.8))
+  , testCase "For all models: not (1 < 0)" $ True @?= noModel (Const 1 :< Const 0)
+  , testCase "For all models: not (1 < 1)" $ True @?= noModel (Const 1 :< Const 1)
+  , testCase "For all models: not (1 <= 0)" $ True @?= noModel (Const 1 :<= Const 0)
+  , testCase "For all models: not (-4.2 <= -4.8)" $ True @?= noModel (Const (-4.3) :<= Const (-4.8))
+  , testCase "For all models: not (19 < -3)" $ True @?= noModel (Const 19 :< Const (-3))
+  , testCase "For all models: not (19 <= -3)" $ True @?= noModel (Const 19 :<= Const (-3))
   ]
  where
   a = Proposition 'a'

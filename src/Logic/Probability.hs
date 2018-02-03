@@ -12,7 +12,7 @@ module Logic.Probability
 import           Control.Applicative         (empty, pure)
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
-import           Data.Ratio                  (numerator)
+import           Data.Ratio                  (denominator)
 import           Logic.Propositional         (Propositional (Not))
 import           Logic.Propositional.DPLL    (CNF, Clause, ConjClause)
 import           Logic.Propositional.Tseitin (Definitional, tseitinTransform)
@@ -101,12 +101,13 @@ instance ( Ord p
          , ModelSearch m model (ConjClause p) )
          => ModelSearch m model (ProbabilityInequality p)
   where
+    findModel (a :<= b) = findModel (b :>= a)
     findModel (a :< b)  = findModel (b :> a)
-    findModel (a :>= b) = findModel (b :<= a)
-    findModel (b :<= a) = maxSatN k' clauses
+    findModel (b :>= a) = maxSatN k' clauses
       where
         (k, clauses) = maxSatNComponents b a
-        k' = ceiling (if 1 == numerator k then k + 1 else k)
+        -- If a Rational is of the form (x / 1), it is an integer
+        k' = ceiling (if 1 == denominator k then k + 1 else k)
     findModel (b :> a)  = maxSatN (floor k) clauses
       where
         (k, clauses) = maxSatNComponents b a
