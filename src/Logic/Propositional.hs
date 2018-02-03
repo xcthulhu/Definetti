@@ -1,3 +1,4 @@
-module Logic.Propositional (Propositional (..)) where
+module Logic.Propositional (Propositional (..), ConjClause, Literal (..)) where
 
-import Logic.Propositional.Tseitin
+import           Logic.Propositional.DPLL
+import           Logic.Propositional.Tseitin

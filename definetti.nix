@@ -1,6 +1,5 @@
-{ mkDerivation, base, containers, dlist, hlint
-, optparse-applicative, QuickCheck, stdenv, tasty, tasty-hunit
-, tasty-quickcheck, vector
+{ mkDerivation, base, containers, hlint, optparse-applicative
+, QuickCheck, stdenv, tasty, tasty-hunit, tasty-quickcheck
 }:
 mkDerivation {
   pname = "definetti";
@@ -8,7 +7,7 @@ mkDerivation {
   src = ./.;
   isLibrary = true;
   isExecutable = true;
-  libraryHaskellDepends = [ base containers dlist vector ];
+  libraryHaskellDepends = [ base containers ];
   executableHaskellDepends = [ base optparse-applicative ];
   testHaskellDepends = [
     base containers hlint QuickCheck tasty tasty-hunit tasty-quickcheck

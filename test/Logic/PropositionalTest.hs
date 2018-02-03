@@ -5,22 +5,22 @@
 module Logic.PropositionalTest (propositionalTests)
 where
 
-import           Control.Applicative      (Alternative, empty, pure)
-import           Control.Monad            (liftM2)
-import qualified Data.Maybe               (isJust, isNothing)
-import           Data.Monoid              ((<>))
-import qualified Data.Set                 (Set, filter, map, member)
-import           Logic.Probability        (Probability (..),
-                                           ProbabilityInequality (..))
-import           Logic.Propositional      (Propositional (..))
-import           Logic.Propositional.DPLL (ConjClause, Literal (Neg, Pos))
-import           Logic.Semantics          (ModelSearch (findModel),
-                                           Semantics ((|=)))
-import           Test.QuickCheck          (Arbitrary (arbitrary), Gen, oneof,
-                                           sized)
-import           Test.Tasty               (TestTree, testGroup)
-import           Test.Tasty.HUnit         (testCase, (@?=))
-import           Test.Tasty.QuickCheck    (testProperty)
+import           Control.Applicative   (Alternative, empty, pure)
+import           Control.Monad         (liftM2)
+import qualified Data.Maybe            (isJust, isNothing)
+import           Data.Monoid           ((<>))
+import qualified Data.Set              (Set, filter, map, member)
+import           Logic.Probability     (Probability (..),
+                                        ProbabilityInequality (..))
+import           Logic.Propositional   (ConjClause, Literal (Neg, Pos),
+                                        Propositional (..))
+import           Logic.Semantics       (ModelSearch (findModel),
+                                        Semantics ((|=)))
+import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, oneof,
+                                        sized)
+import           Test.Tasty            (TestTree, testGroup)
+import           Test.Tasty.HUnit      (testCase, (@?=))
+import           Test.Tasty.QuickCheck (testProperty)
 
 instance Arbitrary p => Arbitrary (Propositional p) where
   arbitrary = sized sizedArbitraryProposition
