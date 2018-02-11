@@ -9,10 +9,9 @@ module Logic.Probability
   , ProbabilityInequality (..)
   ) where
 
-import           Control.Applicative         (empty, pure)
+import           Control.Applicative         (Alternative, empty, pure, (<|>))
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
-import           Data.Ratio                  (denominator)
 import           Logic.Propositional         (Propositional (Not))
 import           Logic.Propositional.DPLL    (CNF, Clause, ConjClause)
 import           Logic.Propositional.Tseitin (Definitional, tseitinTransform)
@@ -68,22 +67,28 @@ maxSatNComponents leftHandSide rightHandSide = (k, clauses)
         + extractConstantTerm rightHandSide
         - extractConstantTerm leftHandSide
 
--- https://mail.haskell.org/pipermail/haskell-cafe/2003-June/004484.html
-(/\/)        :: [a] -> [a] -> [a]
-[]     /\/ ys = ys
-(x:xs) /\/ ys = x : (ys /\/ xs)
-
 -- | Choose `k` elements of a collection of `n` items
 --   Results in `n choose k = n! / (k!(n-k)!)`
 --   Lifted into an `Alternative` functor (so DList may be used)
-choose :: [a] -> Int -> Int -> [[a]]
+choose :: Alternative f => [a] -> Int -> Int -> f [a]
 choose clauses n k
   | k > n             = empty
   | k <= 0            = pure []
   | k == n            = pure clauses
   | [] <- clauses     = error "This should never happen"
-  | (x:xs) <- clauses = choose xs n' k /\/ fmap (x :) (choose xs n' (k - 1))
+  | (x:xs) <- clauses = choose xs n' k <|> fmap (x :) (choose xs n' (k - 1))
   where n' = n - 1
+
+weightedChoose :: Alternative f => [(Int, a)] -> Int -> Int -> f [a]
+weightedChoose clauses n k
+  | k > n                       = empty
+  | k <= 0                      = pure []
+  | k == n                      = pure (map snd clauses)
+  | [] <- clauses               = error "This should never happen"
+  | ((weight, x):xs) <- clauses =
+  let n' = n - weight
+  in weightedChoose xs n' k <|>
+     fmap (x :) (weightedChoose xs n' (k - weight))
 
 -- | Determine if the largest sublist of CNFs simultaneously satisfiable
 --   has length no bigger than `n`
@@ -94,6 +99,7 @@ maxSatN
   -> m model
 maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
  where
+   chooseN :: [CNF a] -> [[CNF a]]
    chooseN xs = choose xs (length xs) (k + 1)
 
 instance ( Ord p
@@ -101,13 +107,12 @@ instance ( Ord p
          , ModelSearch m model (ConjClause p) )
          => ModelSearch m model (ProbabilityInequality p)
   where
-    findModel (a :<= b) = findModel (b :>= a)
     findModel (a :< b)  = findModel (b :> a)
-    findModel (b :>= a) = maxSatN k' clauses
-      where
-        (k, clauses) = maxSatNComponents b a
-        -- If a Rational is of the form (x / 1), it is an integer
-        k' = ceiling (if 1 == denominator k then k + 1 else k)
+    findModel (a :<= b) = findModel (b :>= a)
     findModel (b :> a)  = maxSatN (floor k) clauses
       where
         (k, clauses) = maxSatNComponents b a
+    findModel (b :>= a) = maxSatN (floor k + 1) clauses
+      where
+        (k, clauses) = maxSatNComponents b a
+
