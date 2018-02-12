@@ -14,7 +14,7 @@ import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
 import           Logic.Propositional         (Propositional (Not))
 import           Logic.Propositional.DPLL    (CNF, Clause, ConjClause)
-import           Logic.Propositional.Tseitin (Definitional, tseitinTransform)
+import           Logic.Propositional.Tseitin (tseitinTransform)
 import           Logic.Semantics             (ModelSearch (findModel),
                                               Semantics ((|=)))
 
@@ -31,7 +31,10 @@ data ProbabilityInequality p = (Probability p) :<  (Probability p)
                              | (Probability p) :<= (Probability p)
                              deriving (Ord, Show, Eq)
 
-evalProbability :: Semantics model (Clause p) => model -> Probability p -> Rational
+evalProbability :: Semantics model (Clause p)
+                => model
+                -> Probability p
+                -> Rational
 evalProbability _ (Const c) = c
 evalProbability m (Pr p)    = if m |= p then 1 else 0
 evalProbability m (x :+ y)  = evalProbability m x + evalProbability m y
@@ -53,54 +56,39 @@ extractConstantTerm (Pr    _) = 0
 extractConstantTerm (Const d) = d
 extractConstantTerm (x:+y   ) = extractConstantTerm x + extractConstantTerm y
 
-maxSatNComponents :: Ord p
-                  => Probability p
-                  -> Probability p
-                  -> (Rational, [CNF (Definitional p)])
-maxSatNComponents leftHandSide rightHandSide = (k, clauses)
-  where
-    leftHandPropositions = extractPropositions leftHandSide
-    rightHandPropositions = extractPropositions rightHandSide
-    clauses = fmap tseitinTransform
-                   (fmap Not rightHandPropositions ++ leftHandPropositions)
-    k =   fromIntegral (length rightHandPropositions)
-        + extractConstantTerm rightHandSide
-        - extractConstantTerm leftHandSide
-
--- | Choose `k` elements of a collection of `n` items
---   Results in `n choose k = n! / (k!(n-k)!)`
---   Lifted into an `Alternative` functor (so DList may be used)
-choose :: Alternative f => [a] -> Int -> Int -> f [a]
-choose clauses n k
-  | k > n             = empty
-  | k <= 0            = pure []
-  | k == n            = pure clauses
-  | [] <- clauses     = error "This should never happen"
-  | (x:xs) <- clauses = choose xs n' k <|> fmap (x :) (choose xs n' (k - 1))
-  where n' = n - 1
-
-weightedChoose :: Alternative f => [(Int, a)] -> Int -> Int -> f [a]
-weightedChoose clauses n k
-  | k > n                       = empty
+-- | Choose `k` elements of a collection of weighted elements with
+--   specified total weight. In the event that all elements have weight 1,
+--   this results in exactly
+--   `totalWeight choose k = totalWeight! / (k!(totalWeight-k)!)`
+--   possible choices.
+--   Lifted into an arbitrary `Alternative` functor;
+--   using `List` results in a list of all of the possible choices.
+weightedChoose :: Alternative f
+               => [(Integer, a)]
+               -> Integer
+               -> Integer
+               -> f [a]
+weightedChoose clauses totalWeight k
+  | k > totalWeight             = empty
   | k <= 0                      = pure []
-  | k == n                      = pure (map snd clauses)
+  | k == totalWeight            = pure (map snd clauses)
   | [] <- clauses               = error "This should never happen"
   | ((weight, x):xs) <- clauses =
-  let n' = n - weight
-  in weightedChoose xs n' k <|>
-     fmap (x :) (weightedChoose xs n' (k - weight))
+  let totalWeight' = totalWeight - weight
+  in weightedChoose xs totalWeight' k <|>
+     fmap (x :) (weightedChoose xs totalWeight' (k - weight))
 
 -- | Determine if the largest sublist of CNFs simultaneously satisfiable
---   has length no bigger than `n`
-maxSatN
-  :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
-  => Int
-  -> [CNF a]
-  -> m model
+--   has weight no bigger than `k`
+maxSatN :: (Ord a, MonadPlus m, ModelSearch m model (CNF a))
+        => Integer
+        -> [CNF a]
+        -> m model
 maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
  where
+   totalWeight = fromIntegral . length
    chooseN :: [CNF a] -> [[CNF a]]
-   chooseN xs = choose xs (length xs) (k + 1)
+   chooseN xs = weightedChoose (fmap ((,) 1) xs) (totalWeight xs) (k + 1)
 
 instance ( Ord p
          , MonadPlus m
@@ -109,10 +97,13 @@ instance ( Ord p
   where
     findModel (a :< b)  = findModel (b :> a)
     findModel (a :<= b) = findModel (b :>= a)
+    findModel (b :>= a) = findModel (b :> (a :+ Const 1))
     findModel (b :> a)  = maxSatN (floor k) clauses
       where
-        (k, clauses) = maxSatNComponents b a
-    findModel (b :>= a) = maxSatN (floor k + 1) clauses
-      where
-        (k, clauses) = maxSatNComponents b a
-
+        rightHandPropositions = extractPropositions a
+        clauses = fmap tseitinTransform
+                       (    extractPropositions b
+                         ++ fmap Not rightHandPropositions)
+        k =   fromIntegral (length rightHandPropositions)
+            + extractConstantTerm a
+            - extractConstantTerm b
