@@ -19,8 +19,7 @@ import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
                                       null, partition, singleton, size, toList)
-import           Logic.Semantics     (ModelSearch (findModel), Semantics ((|=)))
-
+import           Logic.Semantics     (ModelSearch (findModel))
 
 -- | Definitional Literals for Definitional Conjunctive Normal Form
 data Literal a = Pos a | Neg a deriving (Ord, Show, Eq)
@@ -36,10 +35,6 @@ type DisjClause a = Clause a
 
 -- | Conjunctive Normal Form
 type CNF a = Data.Set.Set (DisjClause a)
-
--- | Semantics for CNF (note that Clause is ambiguous!)
-instance Semantics model (Clause a) => Semantics model (CNF a) where
-  (|=) m = all (any ((m |=) . Data.Set.singleton))
 
 {- ------ Davis–Putnam–Logemann–Loveland Procedure for Model Search ------ -}
 

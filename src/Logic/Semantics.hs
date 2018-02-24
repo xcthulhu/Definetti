@@ -21,5 +21,5 @@ class Semantics model formula where
 -- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
 -- @
 --
-class (Semantics model formula, Functor m) => ModelSearch m model formula where
+class ModelSearch m model formula where
   findModel :: formula -> m model

@@ -18,7 +18,6 @@ import           Logic.Propositional.DPLL (CNF, Clause, ConjClause,
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
 
-
 -- | Formulae of the Propositional Calculus
 infixr 8 :->:
 data Propositional p = Proposition p
@@ -55,16 +54,6 @@ data Definitional p =
     Definition (Propositional p)  -- ^ a literal that defines a subterm
   | Atom p                        -- ^ a literal for an atomic proposition
     deriving (Ord, Show, Eq)
-
--- | Semantics for Conjunctions of Literals of Definitional Atoms
-instance Semantics model (Clause p)
-       => Semantics model (ConjClause (Definitional p))
-  where
-     (|=) m = all checkSatisfied
-        where
-          checkSatisfied (Pos (Definition f)) = m |= f
-          checkSatisfied (Pos (Atom a))       = m |= Proposition a
-          checkSatisfied (Neg l)              = (not . checkSatisfied . Pos) l
 
 -- | ModelSearch for Conjunctions of Literals of Definitional Atoms
 -- When finding a model for a conjunction of literals of definitional atoms,
