@@ -6,7 +6,6 @@
 
 module Logic.Propositional.DPLL
   ( Literal (Pos, Neg)
-  , Clause
   , ConjClause
   , DisjClause
   , CNF
@@ -56,7 +55,7 @@ data Sequent p = ConjClause p :|-: CNF p
 --    * Every instance of `¬x` is removed from all clauses in B for all `x ∈ L`
 --    * All clauses in `B` containing some `x ∈ L` are removed
 unitPropogate :: Ord p => ConjClause p -> Sequent p -> Sequent p
-unitPropogate literals (assms:|-:clauses) =
+unitPropogate literals (assms :|-: clauses) =
   let resolve = Data.Set.map (\\ Data.Set.map neg literals)
       filterSatisfied =
         Data.Set.filter (Data.Set.null . (literals `Data.Set.intersection`))

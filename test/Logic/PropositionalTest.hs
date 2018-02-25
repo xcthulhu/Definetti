@@ -49,7 +49,7 @@ instance Arbitrary p => Arbitrary (Probability p) where
         | otherwise =
           oneof [ fmap Pr arbitrary
                 , fmap Const arbitrary
-                , liftM2 (:+) halfSizeSubFormula halfSizeSubFormula]
+                , liftM2 (:+) halfSizeSubFormula halfSizeSubFormula ]
         where
           halfSizeSubFormula = sizedProbability (n `div` 2)
 
@@ -60,13 +60,12 @@ instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
                     , liftM2 (:>=) arbitrary arbitrary
                     ]
 
-instance Ord p => Semantics (Data.Set.Set p) (ConjClause p) where
-  (|=) m = all checkSatisfied
-    where
-      checkSatisfied (Pos p) = p `Data.Set.member` m
-      checkSatisfied (Neg p) = not (p `Data.Set.member` m)
+instance Ord p => Semantics (Data.Set.Set p) p where
+  (|=) = flip Data.Set.member
 
--- | ModelSearch for free boolean logic, with no underlying decision procedure
+-- | ModelSearch for conjunctions of free boolean variables
+-- If two of the variables in the conjunction contradict, fail (modeled with Control.Applicative.empty)
+-- Otherwise return the set of positive variables
 instance (Ord p, Alternative f) => ModelSearch f (Data.Set.Set p) (ConjClause p)
   where
     findModel clause =
@@ -126,8 +125,7 @@ propositionalIdentitiesHUnit = testGroup
     $ let searchResult = findModel' (a :&&: (b :||: c))
       in  (True @?=)
             (  (fmap (|= (a :&&: b)) searchResult == Just True)
-            || (fmap (|= (a :&&: c)) searchResult == Just True)
-            )
+            || (fmap (|= (a :&&: c)) searchResult == Just True) )
   ]
  where
   a = Proposition 'a'
@@ -176,7 +174,7 @@ probabilityTheoryQC = testGroup
       <> " :+ Pr ((y :&&: x) :||: (z :&&: x))"
       )
     $ \x y z -> noModel
-          $  (Pr x :+ Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((y :&&: x) :||: (z :&&: x)))
+          $  (2 :* Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((y :&&: x) :||: (z :&&: x)))
   , testProperty "Forall x and Pr: -2 <= Pr x" $ \x -> noModel (Const (-2) :> Pr x)
   , testCase "Exists a model where 5 > 0" $ True @?= someModel (Const 5 :> Const 0)
   , testCase "For all models: not (0 > 5)" $ True @?= noModel (Const 0 :> Const 5)

@@ -13,7 +13,7 @@ module Logic.Propositional.Tseitin
 import           Control.Monad            (MonadPlus)
 import           Data.Monoid              (mempty, (<>))
 import qualified Data.Set                 (Set, insert, singleton)
-import           Logic.Propositional.DPLL (CNF, Clause, ConjClause,
+import           Logic.Propositional.DPLL (CNF, ConjClause,
                                            Literal (Neg, Pos))
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
@@ -30,8 +30,8 @@ data Propositional p = Proposition p
                      deriving (Ord, Show, Eq)
 
 -- | Semantics for the Propositional Calculus
-instance Semantics model (Clause p) => Semantics model (Propositional p) where
-  m |= (Proposition a) = m |= (Data.Set.singleton . Pos) a
+instance Semantics model p => Semantics model (Propositional p) where
+  m |= (Proposition p) = m |= p
   m |= (f :&&: g)      = (m |= f) && (m |= g)
   m |= (f :||: g)      = (m |= f) || (m |= g)
   m |= (f :->: g)      = not (m |= f) || (m |= g)
