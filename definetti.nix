@@ -1,4 +1,4 @@
-{ mkDerivation, base, containers, hlint, optparse-applicative
+{ mkDerivation, base, containers, hlint, mtl, optparse-applicative
 , QuickCheck, stdenv, tasty, tasty-hunit, tasty-quickcheck
 }:
 mkDerivation {
@@ -7,11 +7,12 @@ mkDerivation {
   src = ./.;
   isLibrary = true;
   isExecutable = true;
-  libraryHaskellDepends = [ base containers ];
+  libraryHaskellDepends = [ base containers mtl ];
   executableHaskellDepends = [ base optparse-applicative ];
   testHaskellDepends = [
     base containers hlint QuickCheck tasty tasty-hunit tasty-quickcheck
   ];
   homepage = "https://github.com/githubuser/definetti#readme";
   license = stdenv.lib.licenses.unfree;
+  hydraPlatforms = stdenv.lib.platforms.none;
 }
