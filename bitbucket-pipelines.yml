@@ -9,4 +9,5 @@ pipelines:
   default:
     - step:
         script:
+          - nix-channel --update
           - nix-build
