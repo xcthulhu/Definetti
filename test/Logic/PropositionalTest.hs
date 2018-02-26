@@ -174,16 +174,29 @@ probabilityTheoryQC = testGroup
       <> " :+ Pr ((y :&&: x) :||: (z :&&: x))"
       )
     $ \x y z -> noModel
-          $  (2 :* Pr x) :> (Pr (y :->: (z :&&: x)) :+ Pr (z :->: (y :&&: x)) :+ Pr ((y :&&: x) :||: (z :&&: x)))
-  , testProperty "Forall x and Pr: -2 <= Pr x" $ \x -> noModel (Const (-2) :> Pr x)
-  , testCase "Exists a model where 5 > 0" $ True @?= someModel (Const 5 :> Const 0)
-  , testCase "For all models: not (0 > 5)" $ True @?= noModel (Const 0 :> Const 5)
-  , testCase "For all models: not (1 < 0)" $ True @?= noModel (Const 1 :< Const 0)
-  , testCase "For all models: not (1 < 1)" $ True @?= noModel (Const 1 :< Const 1)
-  , testCase "For all models: not (1 <= 0)" $ True @?= noModel (Const 1 :<= Const 0)
-  , testCase "For all models: not (-4.2 <= -4.8)" $ True @?= noModel (Const (-4.3) :<= Const (-4.8))
-  , testCase "For all models: not (19 < -3)" $ True @?= noModel (Const 19 :< Const (-3))
-  , testCase "For all models: not (19 <= -3)" $ True @?= noModel (Const 19 :<= Const (-3))
+          $  (2 :* Pr x) :> (   Pr (y :->: (z :&&: x))
+                             :+ Pr (z :->: (y :&&: x))
+                             :+ Pr ((y :&&: x) :||: (z :&&: x)))
+  , testProperty "Forall x and Pr: -2 <= Pr x" $
+    \x -> noModel (Const (-2) :> Pr x)
+  , testProperty "Forall x and Pr: 3 * Pr x <= 4 * Pr x" $
+    \x -> noModel ((3 :* Pr x) :> (4 :* Pr x))
+  , testCase "Exists a model where 5 > 0" $
+    True @?= someModel (Const 5 :> Const 0)
+  , testCase "For all models: not (0 > 5)" $
+    True @?= noModel (Const 0 :> Const 5)
+  , testCase "For all models: not (1 < 0)" $
+    True @?= noModel (Const 1 :< Const 0)
+  , testCase "For all models: not (1 < 1)" $
+    True @?= noModel (Const 1 :< Const 1)
+  , testCase "For all models: not (1 <= 0)" $
+    True @?= noModel (Const 1 :<= Const 0)
+  , testCase "For all models: not (-4.2 <= -4.8)" $
+    True @?= noModel (Const (-4.3) :<= Const (-4.8))
+  , testCase "For all models: not (19 < -3)" $
+    True @?= noModel (Const 19 :< Const (-3))
+  , testCase "For all models: not (19 <= -3)" $
+    True @?= noModel (Const 19 :<= Const (-3))
   ]
  where
   a = Proposition 'a'
