@@ -106,15 +106,15 @@ instance ( Ord p
             + if strict then 0 else 1
 
 -- TODO: Use Data.Map
-extractPropositions :: Probability p -> [(Rational,Propositional p)]
-extractPropositions (Pr    p) = [(1,p)]
+extractPropositions :: Probability p -> [(Rational, Propositional p)]
+extractPropositions (Pr p)    = [(1,p)]
 extractPropositions (Const _) = []
-extractPropositions (x:+y   ) = extractPropositions x ++ extractPropositions y
+extractPropositions (x :+ y)  = extractPropositions x ++ extractPropositions y
 extractPropositions (a :* x)  =
   fmap (\(c,p) -> (a * c, p)) (extractPropositions x)
 
 extractConstantTerm :: Probability p -> Rational
-extractConstantTerm (Pr    _) = 0
+extractConstantTerm (Pr _)    = 0
 extractConstantTerm (Const d) = d
 extractConstantTerm (x :+ y)  = extractConstantTerm x + extractConstantTerm y
 extractConstantTerm (a :* x)  = a * extractConstantTerm x
