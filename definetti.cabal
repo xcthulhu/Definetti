@@ -32,7 +32,6 @@ executable shepherd
   build-depends:       definetti
                      , base                 >= 4.7  && < 5
                      , optparse-applicative >= 0.13 && < 0.15
-  default-language:    Haskell2010
   ghc-options:         -Wall -Werror
 
 test-suite definetti-test
