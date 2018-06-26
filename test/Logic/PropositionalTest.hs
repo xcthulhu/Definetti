@@ -84,16 +84,14 @@ propositionalIdentitiesHUnit :: TestTree
 propositionalIdentitiesHUnit = testGroup
   "Simple Model Search Tests"
   [ testCase "No m s.t. `m |= (Verum :->: Falsum)`"
-  $   findModel' (Verum :->: Falsum)
-  @?= Nothing
+  $   findModel' (Verum :->: Falsum) @?= Nothing
   , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
   , testCase "Exists m s.t. `m |= Verum` "
     $ ((True @?=) . Data.Maybe.isJust . findModel') Verum
   , testCase "Exists m s.t. `m |= a`"
     $ ((True @?=) . Data.Maybe.isJust . findModel') a
   , testCase "Exists m s.t. `(m |= Not a) && not (m |= a)`"
-  $   fmap (|= a) (findModel' (Not a))
-  @?= Just False
+    $ fmap (|= a) (findModel' (Not a)) @?= Just False
   , testCase "Exists m s.t. `(m |= (a :||: b)) && ((m |= a) || (m |= b))`"
     $ let searchResult = findModel' (a :||: b)
       in  (True @?=)
