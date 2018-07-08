@@ -21,6 +21,7 @@ library
                      , Logic.Semantics
   other-modules:       Logic.Propositional.Tseitin
                      , Logic.Propositional.DPLL
+                     , Logic.Propositional.Free
   ghc-options:         -Wall -Werror
 
 executable shepherd
