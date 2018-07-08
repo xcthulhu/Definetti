@@ -1,4 +1,5 @@
-module Logic.Propositional (Propositional (..), ConjClause, Literal (..)) where
+module Logic.Propositional (module Propositional, module DPLL) where
 
-import           Logic.Propositional.DPLL
-import           Logic.Propositional.Tseitin
+import           Logic.Propositional.DPLL    as DPLL (ConstraintProblem,
+                                                      Literal (Neg, Pos))
+import           Logic.Propositional.Tseitin as Propositional (Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))

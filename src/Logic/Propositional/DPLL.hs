@@ -2,13 +2,15 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Logic.Propositional.DPLL
   ( Literal (Pos, Neg)
-  , ConjClause
-  , DisjClause
+  , ConstraintProblem
+  , HornClause
   , CNF
+  , ModelSearch (findModel)
+  , ConstrainedModelSearch (findConstrainedModel)
+  , Semantics ((|=))
   ) where
 
 import           Control.Applicative (Alternative, empty, pure)
@@ -18,7 +20,9 @@ import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
                                       null, partition, singleton, size, toList)
-import           Logic.Semantics     (ModelSearch (findModel))
+
+
+{- --------------------------------- Types -------------------------------- -}
 
 -- | Definitional Literals for Definitional Conjunctive Normal Form
 data Literal a = Pos a | Neg a deriving (Ord, Show, Eq)
@@ -26,14 +30,38 @@ data Literal a = Pos a | Neg a deriving (Ord, Show, Eq)
 -- | Clauses are sets of literals
 type Clause a = Data.Set.Set (Literal a)
 
--- | Conjunction of literals
-type ConjClause a = Clause a
+-- | Constraint problems are conjunction of literals
+type ConstraintProblem a = Clause a
 
--- | Disjunction of literals
-type DisjClause a = Clause a
+-- | Horn clauses are disjunctions of literals
+type HornClause a = Clause a
 
 -- | Conjunctive Normal Form
-type CNF a = Data.Set.Set (DisjClause a)
+type CNF a = Data.Set.Set (HornClause a)
+
+
+{- ------------------------------- Instances ------------------------------ -}
+
+-- | Truth-functional semantics
+class Semantics d p where
+  infixr 6 |=
+  (|=) :: d -> p -> Bool
+
+-- | ModelSearch
+--
+-- Model Search interacts with truth functional semantics
+-- by implementing a model search procedure that obeys
+-- the following law:
+--
+-- @
+-- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
+-- @
+--
+class ModelSearch f d p where
+  findModel :: p -> f d
+
+class ConstrainedModelSearch f d l where
+  findConstrainedModel :: ConstraintProblem l -> f d
 
 {- ------ Davis–Putnam–Logemann–Loveland Procedure for Model Search ------ -}
 
@@ -45,6 +73,7 @@ neg (Neg p) = Pos p
 -- | State for DPLL is modeled like logical deduction
 --   LHS: a set of assumptions / partial model (conjunction of literals)
 --   RHS: A set of goals in conjunctive normal form
+type ConjClause a = ConstraintProblem a
 data Sequent p = ConjClause p :|-: CNF p
 
 {- Goal Reduction Rules -}
@@ -96,10 +125,10 @@ oneRule sequent@(_:|-:clauses) =
 -- | Answer-Sat using DPLL
 --   By using an underlying model search procedure for conjuncts of clauses
 --   DPLL can be used to lift that procedure to CNFs of clauses
-instance ( Ord p
+instance ( Ord l
          , MonadPlus m
-         , ModelSearch m model (ConjClause p) )
-         => ModelSearch m model (CNF p)
+         , ConstrainedModelSearch m d l )
+         => ModelSearch m d (CNF l)
   where
   findModel goalClauses = dpll $ mempty :|-: goalClauses
     where
@@ -108,7 +137,7 @@ instance ( Ord p
         guard $ not (mempty `Data.Set.member` clauses)
         case concatMap Data.Set.toList clauses of
           -- If DPLL has terminated, call findModel
-          []  -> findModel assms
+          []  -> findConstrainedModel assms
           -- Otherwise try various tactics for resolving goals
           x:_ -> dpll =<< msum
             [ pureRule sequent

@@ -1,11 +1,15 @@
-{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 module Logic.Propositional.Tseitin
-  ( Propositional (..)
+  ( Propositional ( (:&&:)
+                  , (:->:)
+                  , (:||:)
+                  , Falsum
+                  , Not
+                  , Proposition
+                  , Verum)
   , tseitinTransform
   , Definitional
   ) where
@@ -13,8 +17,9 @@ module Logic.Propositional.Tseitin
 import           Control.Monad            (MonadPlus)
 import           Data.Monoid              (mempty, (<>))
 import qualified Data.Set                 (Set, insert, singleton)
-import           Logic.Propositional.DPLL (CNF, ConjClause,
-                                           Literal (Neg, Pos))
+import           Logic.Propositional.DPLL (CNF, ConstrainedModelSearch,
+                                           Literal (Neg, Pos),
+                                           findConstrainedModel)
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
 
@@ -48,7 +53,7 @@ instance Semantics model p => Semantics model (Propositional p) where
 --   Definitional literals use the propositions they represent themselves
 --   as labels.
 --
---   This is a _referentially transparent_ of creating labels,
+--   This is a _referentially transparent_ means of creating labels,
 --   however it differs from Harrison's method (which uses a counter as state).
 data Definitional p =
     Definition (Propositional p)  -- ^ a literal that defines a subterm
@@ -60,10 +65,10 @@ data Definitional p =
 -- model search proceeds ignoring the definitional atoms.
 instance ( Ord p
          , MonadPlus m
-         , ModelSearch m model (ConjClause p) )
-         => ModelSearch m model (ConjClause (Definitional p))
+         , ConstrainedModelSearch m model p )
+         => ConstrainedModelSearch m model (Definitional p)
   where
-    findModel definitionals = findModel atoms
+    findConstrainedModel definitionals = findConstrainedModel atoms
       where
         atoms = foldr extractAtoms mempty definitionals
         extractAtoms (Pos (Atom a)) = Data.Set.insert (Pos a)
@@ -145,7 +150,7 @@ tseitinTransform f = Data.Set.insert
 -- existing DPLL-based Answer-Sat can be used for the propositional calculus
 instance ( Ord p
          , MonadPlus m
-         , ModelSearch m model (ConjClause p) )
-         => ModelSearch m model (Propositional p)
+         , ConstrainedModelSearch m d p )
+         => ModelSearch m d (Propositional p)
   where
     findModel = findModel . tseitinTransform

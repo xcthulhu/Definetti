@@ -1,25 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+module Logic.Semantics (module DPLL) where
 
-module Logic.Semantics
-  ( Semantics ((|=))
-  , ModelSearch (findModel)
-  ) where
-
-
--- | Truth-functional semantics
-class Semantics model formula where
-  infixr 6 |=
-  (|=) :: model -> formula -> Bool
-
--- | ModelSearch
---
--- Model Search extends truth functional semantics
--- with a model search procedure that obeys the
--- the following law:
---
--- @
--- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
--- @
---
-class ModelSearch m model formula where
-  findModel :: formula -> m model
+import           Logic.Propositional.DPLL as DPLL (ConstrainedModelSearch (findConstrainedModel),
+                                                   ModelSearch (findModel),
+                                                   Semantics ((|=)))

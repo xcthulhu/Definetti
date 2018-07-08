@@ -10,17 +10,18 @@ import           Control.Monad         (liftM2)
 import qualified Data.Maybe            (isJust, isNothing)
 import           Data.Monoid           ((<>))
 import qualified Data.Set              (Set, filter, map, member)
-import           Logic.Probability     (Probability (..),
-                                        ProbabilityInequality (..))
-import           Logic.Propositional   (ConjClause, Literal (Neg, Pos),
-                                        Propositional (..))
-import           Logic.Semantics       (ModelSearch (findModel),
-                                        Semantics ((|=)))
 import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, oneof,
                                         sized)
 import           Test.Tasty            (TestTree, testGroup)
-import           Test.Tasty.HUnit      (testCase, (@?=))
+import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
+
+import           Logic.Probability     (Probability ((:*), (:+), Const, Pr), ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
+import           Logic.Propositional   (Literal (Neg, Pos), Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
+import           Logic.Semantics       (ConstrainedModelSearch (findConstrainedModel),
+                                        ModelSearch (findModel),
+                                        Semantics ((|=)))
+
 
 instance Arbitrary p => Arbitrary (Propositional p) where
   arbitrary = sized sizedArbitraryProposition
@@ -28,15 +29,15 @@ instance Arbitrary p => Arbitrary (Propositional p) where
       -- | Create a propositional formula that has at most depth n
       sizedArbitraryProposition :: Arbitrary p => Int -> Gen (Propositional p)
       sizedArbitraryProposition n
-        | n <= 0 = fmap Proposition arbitrary
+        | n <= 0    = Proposition <$> arbitrary
         | otherwise =
-          oneof [ fmap Proposition arbitrary
+          oneof [ Proposition <$> arbitrary
                 , liftM2 (:&&:) halfSizeSubFormula halfSizeSubFormula
                 , liftM2 (:||:) halfSizeSubFormula halfSizeSubFormula
                 , liftM2 (:->:) halfSizeSubFormula halfSizeSubFormula
-                , fmap Not (sizedArbitraryProposition (n - 1))
-                , return Verum
-                , return Falsum ]
+                , Not <$> sizedArbitraryProposition (n - 1)
+                , pure Verum
+                , pure Falsum ]
         where
           halfSizeSubFormula = sizedArbitraryProposition (n `div` 2)
 
@@ -45,10 +46,10 @@ instance Arbitrary p => Arbitrary (Probability p) where
     where
       sizedProbability :: Arbitrary p => Int -> Gen (Probability p)
       sizedProbability n
-        | n <= 0 = fmap Pr arbitrary
+        | n <= 0 = Pr <$> arbitrary
         | otherwise =
-          oneof [ fmap Pr arbitrary
-                , fmap Const arbitrary
+          oneof [ Pr <$> arbitrary
+                , Const <$> arbitrary
                 , liftM2 (:+) halfSizeSubFormula halfSizeSubFormula ]
         where
           halfSizeSubFormula = sizedProbability (n `div` 2)
@@ -66,12 +67,12 @@ instance Ord p => Semantics (Data.Set.Set p) p where
 -- | ModelSearch for conjunctions of free boolean variables
 -- If two of the variables in the conjunction contradict, fail (modeled with Control.Applicative.empty)
 -- Otherwise return the set of positive variables
-instance (Ord p, Alternative f) => ModelSearch f (Data.Set.Set p) (ConjClause p)
+instance (Ord p, Alternative f) => ConstrainedModelSearch f (Data.Set.Set p) p
   where
-    findModel clause =
+    findConstrainedModel clause =
       if any ((`Data.Set.member` clause) . neg) clause
       then empty
-      else (pure . Data.Set.map project . Data.Set.filter positive) clause
+      else pure . Data.Set.map project . Data.Set.filter positive $ clause
       where
         neg (Pos a) = Neg a
         neg (Neg a) = Pos a
@@ -87,35 +88,32 @@ propositionalIdentitiesHUnit = testGroup
   $   findModel' (Verum :->: Falsum) @?= Nothing
   , testCase "No m s.t. `m |= Falsum`" $ findModel' Falsum @?= Nothing
   , testCase "Exists m s.t. `m |= Verum` "
-    $ ((True @?=) . Data.Maybe.isJust . findModel') Verum
+    $ ((@? "Could not find model for verum") . Data.Maybe.isJust . findModel') Verum
   , testCase "Exists m s.t. `m |= a`"
-    $ ((True @?=) . Data.Maybe.isJust . findModel') a
+    $ ((@? "Could not find model for naked atom 'a'") . Data.Maybe.isJust . findModel') a
   , testCase "Exists m s.t. `(m |= Not a) && not (m |= a)`"
-    $ fmap (|= a) (findModel' (Not a)) @?= Just False
+    $ (|= a) <$> findModel' (Not a) @?= Just False
   , testCase "Exists m s.t. `(m |= (a :||: b)) && ((m |= a) || (m |= b))`"
     $ let searchResult = findModel' (a :||: b)
-      in  (True @?=)
-            (  (fmap (|= a) searchResult == Just True)
-            || (fmap (|= b) searchResult == Just True)
-            )
+      in (  (fmap (|= a) searchResult == Just True)
+         || (fmap (|= b) searchResult == Just True)
+         ) @? "Could not find a model for `a :||: b`"
   , testCase
       (  "Exists m s.t. `(m |= Not (a :||: b)) "
       <> "&& not (m |= a) && not (m |= b)`"
       )
     $ let searchResult = findModel' (Not (a :||: b))
-      in  (True @?=)
-            (  (fmap (|= a) searchResult == Just False)
-            && (fmap (|= b) searchResult == Just False)
-            )
+      in (  (fmap (|= a) searchResult == Just False)
+         && (fmap (|= b) searchResult == Just False)
+         ) @? "Could not find a model for `Not (a :||: b)"
   , testCase
       (  "Exists m s.t. `m |= Not (p && q) "
       <> "&& (not (m |= a) || not (m |= b))`"
       )
     $ let searchResult = findModel' (Not (a :&&: b))
-      in  (True @?=)
-            (  (fmap (|= a) searchResult == Just False)
-            || (fmap (|= b) searchResult == Just False)
-            )
+      in (  (fmap (|= a) searchResult == Just False)
+         || (fmap (|= b) searchResult == Just False)
+         ) @? "Could not find a model for `Not (a :&&: b)`"
   , testCase
       (  "Exists m s.t. `(m |= (a :&&: (b :||: c))) "
       <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`"
