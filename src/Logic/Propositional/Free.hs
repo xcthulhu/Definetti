@@ -2,18 +2,19 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Logic.Propositional.Free where
+module Logic.Propositional.Free (FreeVars (Bound, Free), FreeModel (FreeModel)) where
 
-import           Control.Applicative (Alternative (empty))
-import           Control.Monad       (guard)
+import           Control.Applicative      (Alternative (empty))
+import           Control.Monad            (guard)
 import qualified Data.Set
-import           Logic.Propositional (ConstraintProblem, Literal (Neg, Pos))
-import           Logic.Semantics     (ConstrainedModelSearch (findConstrainedModel),
-                                      Semantics ((|=)))
+import           Logic.Propositional.DPLL (ConstraintProblem,
+                                           Literal (Neg, Pos))
+import           Logic.Semantics          (ConstrainedModelSearch (findConstrainedModel),
+                                           Semantics ((|=)))
 
 
 -- Ultimate goal for data types: FreeVars (Temporal (FreeVars LinearProgram))
-data FreeVars p = Bound p | Free String
+data FreeVars p = Bound p | Free String deriving (Ord, Eq, Show)
 
 data FreeModel d = FreeModel (Data.Set.Set String) d
 

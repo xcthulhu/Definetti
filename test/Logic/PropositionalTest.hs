@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
+
 module Logic.PropositionalTest (propositionalTests)
 where
 
@@ -17,34 +17,46 @@ import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
 import           Logic.Probability     (Probability ((:*), (:+), Const, Pr), ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
-import           Logic.Propositional   (Literal (Neg, Pos), Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
+import           Logic.Propositional   (FreeVars (Bound, Free),
+                                        Literal (Neg, Pos),
+                                        Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics       (ConstrainedModelSearch (findConstrainedModel),
                                         ModelSearch (findModel),
                                         Semantics ((|=)))
 
+newtype Urelement a = Urelement a deriving (Ord, Eq, Show)
 
-instance Arbitrary p => Arbitrary (Propositional p) where
+type Atom a = FreeVars (Urelement a)
+
+bound :: a -> Atom a
+bound = Bound . Urelement
+
+instance Arbitrary p => Arbitrary (Propositional (Atom p)) where
   arbitrary = sized sizedArbitraryProposition
     where
       -- | Create a propositional formula that has at most depth n
-      sizedArbitraryProposition :: Arbitrary p => Int -> Gen (Propositional p)
+      sizedArbitraryProposition :: Arbitrary p => Int -> Gen (Propositional (Atom p))
       sizedArbitraryProposition n
-        | n <= 0    = Proposition <$> arbitrary
-        | otherwise =
-          oneof [ Proposition <$> arbitrary
-                , liftM2 (:&&:) halfSizeSubFormula halfSizeSubFormula
-                , liftM2 (:||:) halfSizeSubFormula halfSizeSubFormula
-                , liftM2 (:->:) halfSizeSubFormula halfSizeSubFormula
-                , Not <$> sizedArbitraryProposition (n - 1)
-                , pure Verum
-                , pure Falsum ]
+        | n <= 0    = oneof atomic
+        | otherwise = oneof $ atomic <>
+          [ liftM2 (:&&:) halfSizeSubFormula halfSizeSubFormula
+          , liftM2 (:||:) halfSizeSubFormula halfSizeSubFormula
+          , liftM2 (:->:) halfSizeSubFormula halfSizeSubFormula
+          , Not <$> sizedArbitraryProposition (n - 1)
+          , pure Verum
+          , pure Falsum
+          ]
         where
+          atomic =
+            [ Proposition . bound <$> arbitrary
+            , Proposition . Free <$> arbitrary
+            ]
           halfSizeSubFormula = sizedArbitraryProposition (n `div` 2)
 
-instance Arbitrary p => Arbitrary (Probability p) where
+instance Arbitrary p => Arbitrary (Probability (Atom p)) where
   arbitrary = sized sizedProbability
     where
-      sizedProbability :: Arbitrary p => Int -> Gen (Probability p)
+      sizedProbability :: Arbitrary p => Int -> Gen (Probability (Atom p))
       sizedProbability n
         | n <= 0 = Pr <$> arbitrary
         | otherwise =
@@ -54,20 +66,20 @@ instance Arbitrary p => Arbitrary (Probability p) where
         where
           halfSizeSubFormula = sizedProbability (n `div` 2)
 
-instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
+instance Arbitrary p => Arbitrary (ProbabilityInequality (Atom p)) where
   arbitrary = oneof [ liftM2 (:>) arbitrary arbitrary
                     , liftM2 (:<) arbitrary arbitrary
                     , liftM2 (:<=) arbitrary arbitrary
                     , liftM2 (:>=) arbitrary arbitrary
                     ]
 
-instance Ord p => Semantics (Data.Set.Set p) p where
+instance Ord p => Semantics (Data.Set.Set (Atom p)) (Atom p) where
   (|=) = flip Data.Set.member
 
 -- | ModelSearch for conjunctions of free boolean variables
 -- If two of the variables in the conjunction contradict, fail (modeled with Control.Applicative.empty)
 -- Otherwise return the set of positive variables
-instance (Ord p, Alternative f) => ConstrainedModelSearch f (Data.Set.Set p) p
+instance (Ord p, Alternative f) => ConstrainedModelSearch f (Data.Set.Set (Atom p)) (Atom p)
   where
     findConstrainedModel clause =
       if any ((`Data.Set.member` clause) . neg) clause
@@ -119,15 +131,15 @@ propositionalIdentitiesHUnit = testGroup
       <> "&& (m |= (a :&&: b) || m |= (a :&&: c))`"
       )
     $ let searchResult = findModel' (a :&&: (b :||: c))
-      in  (True @?=)
-            (  (fmap (|= (a :&&: b)) searchResult == Just True)
-            || (fmap (|= (a :&&: c)) searchResult == Just True) )
+      in  (  (fmap (|= (a :&&: b)) searchResult == Just True)
+          || (fmap (|= (a :&&: c)) searchResult == Just True)
+          ) @? "Could not find a model for `a :&&: (b :||: c)`"
   ]
  where
-  a = Proposition 'a'
-  b = Proposition 'b'
-  c = Proposition 'c'
-  findModel' :: Propositional Char -> Maybe (Data.Set.Set Char)
+  a = Proposition . bound $ 'a'
+  b = Proposition . bound $ 'b'
+  c = Proposition . bound $ 'c'
+  findModel' :: Propositional (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
   findModel' = findModel
 
 propositionalSemanticsQC :: TestTree
@@ -140,7 +152,7 @@ propositionalSemanticsQC = testGroup
       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
   ]
  where
-  findModel' :: Propositional Char -> Maybe (Data.Set.Set Char)
+  findModel' :: Propositional (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
   findModel' = findModel
 
 probabilityTheoryQC :: TestTree
@@ -195,9 +207,9 @@ probabilityTheoryQC = testGroup
     True @?= noModel (Const 19 :<= Const (-3))
   ]
  where
-  a = Proposition 'a'
-  b = Proposition 'b'
-  findModel' :: ProbabilityInequality Char -> Maybe (Data.Set.Set Char)
+  a = Proposition . bound $ 'a'
+  b = Proposition . bound $ 'b'
+  findModel' :: ProbabilityInequality (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
   findModel' = findModel
   noModel    = Data.Maybe.isNothing . findModel'
   someModel  = Data.Maybe.isJust . findModel'
@@ -212,7 +224,7 @@ probabilityInequalitySemanticsQC = testGroup
       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
   ]
  where
-  findModel' :: ProbabilityInequality Char -> Maybe (Data.Set.Set Char)
+  findModel' :: ProbabilityInequality (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
   findModel' = findModel
 
 propositionalTests :: TestTree
