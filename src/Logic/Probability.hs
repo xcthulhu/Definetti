@@ -10,6 +10,7 @@ module Logic.Probability
   ) where
 
 import           Control.Applicative         (Alternative, empty, pure, (<|>))
+import           Control.Arrow               (second, (***))
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
 import           Data.Monoid                 ((<>))
@@ -20,7 +21,6 @@ import           Logic.Propositional.DPLL    (CNF, ConstrainedModelSearch)
 import           Logic.Propositional.Tseitin (tseitinTransform)
 import           Logic.Semantics             (ModelSearch (findModel),
                                               Semantics ((|=)))
-
 
 -- | Probability Inequalities
 data Probability p = Pr (Propositional p)
@@ -48,19 +48,16 @@ instance Semantics d p => Semantics d (ProbabilityInequality p) where
   m |= (a :>= b) = evalProbability m a >= evalProbability m b
   m |= (a :> b)  = evalProbability m a >  evalProbability m b
 
-
-
 -- | Normal form for probabilistic inequalities / Trades
 -- Represents equations of the form:
--- `w1 * a1 + w2 * a2 + ... + C1 </<= v1 * b1 + v2 * b2 + .. + C2`
+-- `w1 * a1 + w2 * a2 + ... + C </<= v1 * b1 + v2 * b2 + ...`
 -- here `</<=` is either strict or non-strict inequality
 
 data GTSummationNormalForm a =
-  GTSummationNormalForm { leftHandTerms     :: [(Rational, a)]
-                        , leftHandConstant  :: Rational
-                        , rightHandTerms    :: [(Rational, a)]
-                        , rightHandConstant :: Rational
-                        , strict            :: Bool }
+  GTSummationNormalForm { leftHandTerms    :: [(Rational, a)]
+                        , leftHandConstant :: Rational
+                        , rightHandTerms   :: [(Rational, a)]
+                        , strict           :: Bool }
 
 -- TODO: Use Data.Map
 extractPropositions :: Probability p -> [(Rational, Propositional p)]
@@ -83,9 +80,8 @@ summationNormalForm (b :>= a) = summationNormalForm (a :<= b)
 summationNormalForm (a :< b)  = (summationNormalForm (a :<= b)) {strict = True}
 summationNormalForm (a :<= b) =
   GTSummationNormalForm { leftHandTerms = extractPropositions a
-                        , leftHandConstant = extractConstantTerm a
+                        , leftHandConstant = extractConstantTerm a - extractConstantTerm b
                         , rightHandTerms = extractPropositions b
-                        , rightHandConstant = extractConstantTerm b
                         , strict = False }
 
 -- | Choose `k` elements of a collection of weighted elements with
@@ -142,17 +138,15 @@ instance ( Ord p
   where
     findModel GTSummationNormalForm {..} = maxSatN (floor k) clauses
       where
+        allTerms = leftHandTerms <> rightHandTerms
         denominatorProduct =
-          fromIntegral (product (fmap (denominator . fst)
-                                      (leftHandTerms <> rightHandTerms)))
-        transform = fmap (\ (w, p) -> ( floor (denominatorProduct * w)
-                                      , tseitinTransform p))
-        transformedLeftHandSide = (transform . fmap (\ (w, p) -> (w, Not p)))
-                                  leftHandTerms
-        transformedRightHandSide = transform rightHandTerms
+          fromIntegral . foldr lcm 1 . fmap (denominator . fst) $ allTerms
+        transform = (floor . (denominatorProduct *)) *** tseitinTransform
+        transformedLeftHandSide = transform . second Not <$> leftHandTerms
+        transformedRightHandSide = transform <$> rightHandTerms
         clauses = transformedLeftHandSide <> transformedRightHandSide
-        k =   fromIntegral (sum (fmap fst transformedLeftHandSide))
-            + denominatorProduct * (leftHandConstant - rightHandConstant)
+        k =   (fromIntegral . sum . fmap fst) transformedLeftHandSide
+            + denominatorProduct * leftHandConstant
             + if strict then 0 else 1
 
 instance ( Ord p
