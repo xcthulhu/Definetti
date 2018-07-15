@@ -14,18 +14,24 @@ import           Logic.Semantics          (ConstrainedModelSearch (findConstrain
 
 
 -- Ultimate goal for data types: FreeVars (Temporal (FreeVars LinearProgram))
-data FreeVars p = Bound p | Free String deriving (Ord, Eq, Show)
+data FreeVars a p = Bound p | Free a deriving (Ord, Eq, Show)
 
-data FreeModel d = FreeModel (Data.Set.Set String) d
+data FreeModel a d = FreeModel (Data.Set.Set a) d
 
-instance Semantics d a => Semantics (FreeModel d) (ConstraintProblem (FreeVars a)) where
+instance ( Ord a
+         , Semantics d p
+         ) => Semantics (FreeModel a d) (ConstraintProblem (FreeVars a p)) where
   (|=) (FreeModel freeVariablesSetToTrue m) = all checkedToBeTrue
     where
       checkedToBeTrue (Neg l)         = not (checkedToBeTrue (Pos l))
       checkedToBeTrue (Pos (Bound p)) = m |= p
       checkedToBeTrue (Pos (Free v))  = v `Data.Set.member` freeVariablesSetToTrue
 
-instance (Ord p, Alternative f, ConstrainedModelSearch f d p) => ConstrainedModelSearch f (FreeModel d) (FreeVars p) where
+instance ( Ord a
+         , Ord p
+         , Alternative f
+         , ConstrainedModelSearch f d p
+         ) => ConstrainedModelSearch f (FreeModel a d) (FreeVars a p) where
   findConstrainedModel clause = FreeModel <$> maybe empty pure maybeFreeVariablesSetToTrue
                                           <*> findConstrainedModel boundLiterals
     where
