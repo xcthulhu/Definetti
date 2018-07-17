@@ -19,6 +19,7 @@ library
   exposed-modules:     Logic.Propositional
                      , Logic.Probability
                      , Logic.Semantics
+                     , Logic.Temporal
   other-modules:       Logic.Propositional.Tseitin
                      , Logic.Propositional.DPLL
                      , Logic.Propositional.Free
