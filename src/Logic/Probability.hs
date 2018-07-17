@@ -10,9 +10,11 @@ module Logic.Probability
   ) where
 
 import           Control.Applicative         (Alternative, empty, pure, (<|>))
-import           Control.Arrow               (second, (***))
+import           Control.Arrow               (first, second, (***))
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
+import           Data.List                   (partition)
+import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
 import           Data.Ratio                  (denominator)
 
@@ -54,35 +56,54 @@ instance Semantics d p => Semantics d (ProbabilityInequality p) where
 -- here `</<=` is either strict or non-strict inequality
 
 data GTSummationNormalForm a =
-  GTSummationNormalForm { leftHandTerms    :: [(Rational, a)]
+  GTSummationNormalForm { leftHandTerms    :: [(a, Rational)]
                         , leftHandConstant :: Rational
-                        , rightHandTerms   :: [(Rational, a)]
+                        , rightHandTerms   :: [(a, Rational)]
                         , strict           :: Bool }
 
--- TODO: Use Data.Map
-extractPropositions :: Probability p -> [(Rational, Propositional p)]
-extractPropositions (Pr p)    = [(1,p)]
-extractPropositions (Const _) = []
-extractPropositions (x :+ y)  = extractPropositions x ++ extractPropositions y
-extractPropositions (a :* x)  =
-  fmap (\(c,p) -> (a * c, p)) (extractPropositions x)
 
-extractConstantTerm :: Probability p -> Rational
+add :: (Ord p, Num n) => Map.Map p n -> Map.Map p n -> Map.Map p n
+add = Map.unionWith (+)
+
+extractPropositions :: Ord p
+                    => Probability p
+                    -> Map.Map (Propositional p) Rational
+extractPropositions (Pr p)    = Map.singleton p 1
+extractPropositions (Const _) = Map.empty
+extractPropositions (x :+ y)  =
+  extractPropositions x `add` extractPropositions y
+extractPropositions (a :* x)  =
+  Map.map (a *) (extractPropositions x)
+
+extractConstantTerm :: Probability p
+                    -> Rational
 extractConstantTerm (Pr _)    = 0
 extractConstantTerm (Const d) = d
 extractConstantTerm (x :+ y)  = extractConstantTerm x + extractConstantTerm y
 extractConstantTerm (a :* x)  = a * extractConstantTerm x
 
-summationNormalForm :: ProbabilityInequality p
+summationNormalForm :: Ord p
+                    => ProbabilityInequality p
                     -> GTSummationNormalForm (Propositional p)
 summationNormalForm (b :>  a) = summationNormalForm (a :<  b)
 summationNormalForm (b :>= a) = summationNormalForm (a :<= b)
 summationNormalForm (a :< b)  = (summationNormalForm (a :<= b)) {strict = True}
 summationNormalForm (a :<= b) =
-  GTSummationNormalForm { leftHandTerms = extractPropositions a
-                        , leftHandConstant = extractConstantTerm a - extractConstantTerm b
-                        , rightHandTerms = extractPropositions b
-                        , strict = False }
+  GTSummationNormalForm
+  { leftHandTerms = lhts
+  , leftHandConstant = extractConstantTerm a - extractConstantTerm b
+  , rightHandTerms = rhts
+  , strict = False }
+  where
+    x `minus` y = x `add` Map.map negate y
+    weightedTerms =
+      Map.toList $ extractPropositions a `minus` extractPropositions b
+    (lhts, rhts) =
+        second (fmap (second negate))
+      . partition ((>0) . snd)
+      . filter ((/= 0) . snd)
+      $ weightedTerms
+
 
 -- | Choose `k` elements of a collection of weighted elements with
 --   specified total weight. In the event that all elements have weight 1,
@@ -92,16 +113,16 @@ summationNormalForm (a :<= b) =
 --   Lifted into an arbitrary `Alternative` functor;
 --   using `List` results in a list of all of the possible choices.
 weightedChoose :: Alternative f
-               => [(Integer, a)]
+               => [(a, Integer)]
                -> Integer
                -> Integer
                -> f [a]
 weightedChoose clauses totalWeight k
   | k > totalWeight             = empty
   | k <= 0                      = pure []
-  | k == totalWeight            = pure (map snd clauses)
+  | k == totalWeight            = pure (map fst clauses)
   | [] <- clauses               = error "This should never happen"
-  | ((weight, x):xs) <- clauses =
+  | ((x, weight):xs) <- clauses =
   let totalWeight' = totalWeight - weight
   in weightedChoose xs totalWeight' k <|>
      fmap (x :) (weightedChoose xs totalWeight' (k - weight))
@@ -110,12 +131,12 @@ weightedChoose clauses totalWeight k
 --   has weight no bigger than `k`
 maxSatN :: (Ord a, MonadPlus m, ModelSearch m d (CNF a))
         => Integer
-        -> [(Integer, CNF a)]
+        -> [(CNF a, Integer)]
         -> m d
 maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
  where
-   totalWeight = sum . fmap fst
-   chooseN :: [(Integer, CNF a)] -> [[CNF a]]
+   totalWeight = sum . fmap snd
+   chooseN :: [(CNF a, Integer)] -> [[CNF a]]
    chooseN xs = weightedChoose xs (totalWeight xs) (k + 1)
 
 -- | Model search for probabilistic inequalities in 'GTSummationNormalForm'
@@ -140,12 +161,12 @@ instance ( Ord p
       where
         allTerms = leftHandTerms <> rightHandTerms
         denominatorProduct =
-          fromIntegral . foldr lcm 1 . fmap (denominator . fst) $ allTerms
-        transform = (floor . (denominatorProduct *)) *** tseitinTransform
-        transformedLeftHandSide = transform . second Not <$> leftHandTerms
+          fromIntegral . foldr lcm 1 . fmap (denominator . snd) $ allTerms
+        transform = tseitinTransform *** (floor . (denominatorProduct *))
+        transformedLeftHandSide = transform . first Not <$> leftHandTerms
         transformedRightHandSide = transform <$> rightHandTerms
         clauses = transformedLeftHandSide <> transformedRightHandSide
-        k =   (fromIntegral . sum . fmap fst) transformedLeftHandSide
+        k =   (fromIntegral . sum . fmap snd) transformedLeftHandSide
             + denominatorProduct * leftHandConstant
             + if strict then 0 else 1
 

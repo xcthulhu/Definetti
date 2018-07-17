@@ -210,7 +210,6 @@ probabilityTheoryQC = testGroup
   , testCase "Exists a model where (-1 * a < b)" $
     let p = ((-1) :* Pr a) :< Pr b
     in (|= p) <$> findModel' p @?= Just True
-  -- TODO: ((11898861686879 % 296888183719) :* Pr (Proposition (Free "\f\EMj\836841\RSBm\1020663\459825\\\468079\n\1082075V%\327008bp"))) :>= (((((-55495868578514) % 1819074629007) :* Pr Falsum) :+ Pr (Not (Not (Not (Proposition (Free "%\DC4")))))) :+ Pr (Verum :->: Proposition (Free "\1005188") :&&: Verum))
   ]
  where
   a = Proposition . bound $ 'a'
@@ -220,18 +219,18 @@ probabilityTheoryQC = testGroup
   noModel    = (Nothing ==) . findModel'
   someModel p = ((|= p) <$> findModel' p) == Just True
 
--- probabilityInequalitySemanticsQC :: TestTree
--- probabilityInequalitySemanticsQC = testGroup
---   "Probability Semantics Laws"
---   [ testProperty
---         (  "Forall f: `fmap (|= f) (findModel f)"
---         <> " == fmap (const True) (findModel f)`"
---         )
---       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
---   ]
---  where
---   findModel' :: ProbabilityInequality (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
---   findModel' = findModel
+probabilityInequalitySemanticsQC :: TestTree
+probabilityInequalitySemanticsQC = testGroup
+  "Probability Semantics Laws"
+  [ testProperty
+        (  "Forall f: `fmap (|= f) (findModel f)"
+        <> " == fmap (const True) (findModel f)`"
+        )
+      $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+  ]
+ where
+  findModel' :: ProbabilityInequality (Atom Char) -> Maybe (Data.Set.Set (Atom Char))
+  findModel' = findModel
 
 propositionalTests :: TestTree
 propositionalTests = testGroup
@@ -239,5 +238,5 @@ propositionalTests = testGroup
   [ propositionalIdentitiesHUnit
   , propositionalSemanticsQC
   , probabilityTheoryQC
-  -- , probabilityInequalitySemanticsQC
+  , probabilityInequalitySemanticsQC
   ]
