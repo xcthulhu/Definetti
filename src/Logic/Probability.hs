@@ -129,7 +129,7 @@ weightedChoose clauses totalWeight k
 
 -- | Determine if the largest sublist of CNFs simultaneously satisfiable
 --   has weight no bigger than `k`
-maxSatN :: (Ord a, MonadPlus m, ModelSearch m d (CNF a))
+maxSatN :: (Ord a, MonadPlus m, ModelSearch d (CNF a) m)
         => Integer
         -> [(CNF a, Integer)]
         -> m d
@@ -154,8 +154,8 @@ maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
 -- where \(\hat{x}\) is \(x\) times the least common multiple of the denominators of all of coefficients and constants.
 instance ( Ord p
          , MonadPlus m
-         , ConstrainedModelSearch m d p )
-         => ModelSearch m d (GTSummationNormalForm (Propositional p))
+         , ConstrainedModelSearch d p m )
+         => ModelSearch d (GTSummationNormalForm (Propositional p)) m
   where
     findModel GTSummationNormalForm {..} = maxSatN (floor k) clauses
       where
@@ -172,7 +172,7 @@ instance ( Ord p
 
 instance ( Ord p
          , MonadPlus m
-         , ConstrainedModelSearch m d p )
-         => ModelSearch m d (ProbabilityInequality p)
+         , ConstrainedModelSearch d p m )
+         => ModelSearch d (ProbabilityInequality p) m
   where
     findModel = findModel . summationNormalForm

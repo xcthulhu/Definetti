@@ -9,7 +9,7 @@ module Logic.Propositional.Tseitin
                   , Falsum
                   , Not
                   , Proposition
-                  , Verum)
+                  , Verum )
   , tseitinTransform
   , Definitional
   ) where
@@ -17,11 +17,13 @@ module Logic.Propositional.Tseitin
 import           Control.Monad            (MonadPlus)
 import           Data.Monoid              (mempty, (<>))
 import qualified Data.Set                 (Set, insert, singleton)
+
 import           Logic.Propositional.DPLL (CNF, ConstrainedModelSearch,
                                            Literal (Neg, Pos),
                                            findConstrainedModel)
 import           Logic.Semantics          (ModelSearch (findModel),
                                            Semantics ((|=)))
+
 
 -- | Formulae of the Propositional Calculus
 infixr 8 :->:
@@ -35,7 +37,7 @@ data Propositional p = Proposition p
                      deriving (Ord, Show, Eq)
 
 -- | Semantics for the Propositional Calculus
-instance Semantics model p => Semantics model (Propositional p) where
+instance Semantics d p => Semantics d (Propositional p) where
   m |= (Proposition p) = m |= p
   m |= (f :&&: g)      = (m |= f) && (m |= g)
   m |= (f :||: g)      = (m |= f) || (m |= g)
@@ -45,6 +47,7 @@ instance Semantics model p => Semantics model (Propositional p) where
   _ |= Falsum          = False
 
 -- | Definitional Atoms
+--
 -- Inspired by John Harrison's
 -- "Handbook of Practical Logic and Automated Reasoning" (2009),
 -- Section 2.8, pgs. 75-77
@@ -55,18 +58,20 @@ instance Semantics model p => Semantics model (Propositional p) where
 --
 --   This is a _referentially transparent_ means of creating labels,
 --   however it differs from Harrison's method (which uses a counter as state).
+
 data Definitional p =
     Definition (Propositional p)  -- ^ a literal that defines a subterm
   | Atom p                        -- ^ a literal for an atomic proposition
     deriving (Ord, Show, Eq)
 
--- | ModelSearch for Conjunctions of Literals of Definitional Atoms
+-- | ConstrainedModelSearch for Conjunctions of Literals of Definitional Atoms
 -- When finding a model for a conjunction of literals of definitional atoms,
 -- model search proceeds ignoring the definitional atoms.
+
 instance ( Ord p
          , MonadPlus m
-         , ConstrainedModelSearch m model p )
-         => ConstrainedModelSearch m model (Definitional p)
+         , ConstrainedModelSearch d p m )
+         => ConstrainedModelSearch d (Definitional p) m
   where
     findConstrainedModel definitionals = findConstrainedModel atoms
       where
@@ -150,7 +155,7 @@ tseitinTransform f = Data.Set.insert
 -- existing DPLL-based Answer-Sat can be used for the propositional calculus
 instance ( Ord p
          , MonadPlus m
-         , ConstrainedModelSearch m d p )
-         => ModelSearch m d (Propositional p)
+         , ConstrainedModelSearch d p m )
+         => ModelSearch d (Propositional p) m
   where
     findModel = findModel . tseitinTransform

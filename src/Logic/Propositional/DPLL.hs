@@ -40,7 +40,7 @@ type HornClause a = Clause a
 type CNF a = Data.Set.Set (HornClause a)
 
 
-{- ------------------------------- Instances ------------------------------ -}
+{- ------------------------------ Type Classes ----------------------------- -}
 
 -- | Truth-functional semantics
 class Semantics d p where
@@ -57,11 +57,12 @@ class Semantics d p where
 -- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
 -- @
 --
-class ModelSearch f d p where
+class ModelSearch d p f where
   findModel :: p -> f d
 
-class ConstrainedModelSearch f d l where
+class ConstrainedModelSearch d l f where
   findConstrainedModel :: ConstraintProblem l -> f d
+
 
 {- ------ Davis–Putnam–Logemann–Loveland Procedure for Model Search ------ -}
 
@@ -127,8 +128,8 @@ oneRule sequent@(_:|-:clauses) =
 --   DPLL can be used to lift that procedure to CNFs of clauses
 instance ( Ord l
          , MonadPlus m
-         , ConstrainedModelSearch m d l )
-         => ModelSearch m d (CNF l)
+         , ConstrainedModelSearch d l m )
+         => ModelSearch d (CNF l) m
   where
   findModel goalClauses = dpll $ mempty :|-: goalClauses
     where

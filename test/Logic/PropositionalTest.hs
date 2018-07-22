@@ -81,7 +81,7 @@ instance Ord p => Semantics (Data.Set.Set (Atom p)) (Atom p) where
 -- | ModelSearch for conjunctions of free boolean variables
 -- If two of the variables in the conjunction contradict, fail (modeled with Control.Applicative.empty)
 -- Otherwise return the set of positive variables
-instance (Ord p, Alternative f) => ConstrainedModelSearch f (Data.Set.Set (Atom p)) (Atom p)
+instance (Ord p, Alternative f) => ConstrainedModelSearch (Data.Set.Set (Atom p)) (Atom p) f
   where
     findConstrainedModel clause =
       if any ((`Data.Set.member` clause) . neg) clause
