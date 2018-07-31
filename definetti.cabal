@@ -47,6 +47,8 @@ test-suite definetti-test
                      , tasty-hunit      >= 0.9  && < 1.0
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   other-modules:       Logic.PropositionalTest
+                     , Logic.ProbabilityTest
+                     , Logic.TemporalTest
   default-language:    Haskell2010
   ghc-options:         -Wall -Werror
 
