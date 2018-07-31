@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MonoLocalBinds        #-}
@@ -25,7 +26,7 @@ import qualified Data.Set            (Set, filter, intersection, map, member,
 {- --------------------------------- Types -------------------------------- -}
 
 -- | Definitional Literals for Definitional Conjunctive Normal Form
-data Literal a = Pos a | Neg a deriving (Ord, Show, Eq)
+data Literal a = Pos a | Neg a deriving (Ord, Show, Eq, Functor)
 
 -- | Clauses are sets of literals
 type Clause a = Data.Set.Set (Literal a)
@@ -74,8 +75,7 @@ neg (Neg p) = Pos p
 -- | State for DPLL is modeled like logical deduction
 --   LHS: a set of assumptions / partial model (conjunction of literals)
 --   RHS: A set of goals in conjunctive normal form
-type ConjClause a = ConstraintProblem a
-data Sequent p = ConjClause p :|-: CNF p
+data Sequent p = ConstraintProblem p :|-: CNF p
 
 {- Goal Reduction Rules -}
 
@@ -84,7 +84,7 @@ data Sequent p = ConjClause p :|-: CNF p
 --   where `B'` is defined by
 --    * Every instance of `¬x` is removed from all clauses in B for all `x ∈ L`
 --    * All clauses in `B` containing some `x ∈ L` are removed
-unitPropogate :: Ord p => ConjClause p -> Sequent p -> Sequent p
+unitPropogate :: Ord p => ConstraintProblem p -> Sequent p -> Sequent p
 unitPropogate literals (assms :|-: clauses) =
   let resolve = Data.Set.map (\\ Data.Set.map neg literals)
       filterSatisfied =
