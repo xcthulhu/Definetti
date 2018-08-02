@@ -78,6 +78,9 @@ instance (Ord p, Alternative f) => ConstrainedModelSearch (AtomModel p) (Atom p)
         positive (Pos _) = True
         positive (Neg _) = False
 
+findModel' :: Propositional (Atom Char) -> Maybe (AtomModel Char)
+findModel' = findModel
+
 propositionalIdentitiesHUnit :: TestTree
 propositionalIdentitiesHUnit = testGroup
   "Simple Model Search Tests"
@@ -124,8 +127,6 @@ propositionalIdentitiesHUnit = testGroup
   a = Proposition . bound $ 'a'
   b = Proposition . bound $ 'b'
   c = Proposition . bound $ 'c'
-  findModel' :: Propositional (Atom Char) -> Maybe (AtomModel Char)
-  findModel' = findModel
 
 propositionalSemanticsQC :: TestTree
 propositionalSemanticsQC = testGroup
@@ -134,11 +135,9 @@ propositionalSemanticsQC = testGroup
         (  "Forall f: `fmap (|= f) (findModel f)"
         <> " == fmap (const True) (findModel f)`"
         )
-      $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+      $ \f -> let m = findModel' f
+              in fmap (|= f) m == fmap (const True) m
   ]
- where
-  findModel' :: Propositional (Atom Char) -> Maybe (AtomModel Char)
-  findModel' = findModel
 
 propositionalTests :: TestTree
 propositionalTests = testGroup
