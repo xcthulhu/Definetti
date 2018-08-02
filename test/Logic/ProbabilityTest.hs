@@ -42,6 +42,9 @@ instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
                     , liftM2 (:>=) arbitrary arbitrary
                     ]
 
+findModel' :: ProbabilityInequality (Atom Char) -> Maybe (AtomModel Char)
+findModel' = findModel
+
 probabilityTheoryQC :: TestTree
 probabilityTheoryQC = testGroup
   "Probability Theory Identities"
@@ -99,8 +102,6 @@ probabilityTheoryQC = testGroup
  where
   a = Proposition . bound $ 'a'
   b = Proposition . bound $ 'b'
-  findModel' :: ProbabilityInequality (Atom Char) -> Maybe (AtomModel Char)
-  findModel' = findModel
   noModel    = (Nothing ==) . findModel'
   someModel p = ((|= p) <$> findModel' p) == Just True
 
@@ -111,11 +112,9 @@ probabilityInequalitySemanticsQC = testGroup
         (  "Forall f: `fmap (|= f) (findModel f)"
         <> " == fmap (const True) (findModel f)`"
         )
-      $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
+      $ \f -> let m = findModel' f
+              in fmap (|= f) m == fmap (const True) m
   ]
- where
-  findModel' :: ProbabilityInequality (Atom Char) -> Maybe (AtomModel Char)
-  findModel' = findModel
 
 probabilityTests :: TestTree
 probabilityTests = testGroup
