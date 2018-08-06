@@ -37,7 +37,7 @@ executable shepherd
 test-suite definetti-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             TestSuite.hs
+  main-is:             TastyTests.hs
   build-depends:       definetti
                      , base             >= 4.7  && < 5
                      , QuickCheck       >= 2.9  && < 2.11
@@ -46,9 +46,10 @@ test-suite definetti-test
                      , tasty-quickcheck >= 0.8  && < 0.10
                      , tasty-hunit      >= 0.9  && < 1.0
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  other-modules:       Logic.PropositionalTest
-                     , Logic.ProbabilityTest
-                     , Logic.TemporalTest
+  other-modules:       Logic.Tasty.Suite.PropositionalTest
+                     , Logic.Tasty.Suite.ProbabilityTest
+                     , Logic.Tasty.Suite.TemporalTest
+                     , Logic.TestAtom
   default-language:    Haskell2010
   ghc-options:         -Wall -Werror
 

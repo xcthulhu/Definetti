@@ -34,13 +34,11 @@ a `before` b = Proposition (Not b `Until` a) :&&:
 
 data Until_ a = a `Until_` a deriving (Functor)
 
-instance Semantics d p => Semantics [d] (Temporal p) where
-  ms     |= (Always p)      = all (|= p) ms
-  (m:ms) |= u@(p `Until` q) = m |= q || (m |= p && ms |= u)
-  []     |= (_ `Until` _)   = False
-
 instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
-  (|=) (m:|ms) = (|=) (m:ms)
+  (|=) (m:|ms) = (|==) (m:ms) where
+    ms'      |== (Always p)      = all (|= p) ms'
+    (m':ms') |== u@(p `Until` q) = m' |= q || (m' |= p && ms' |== u)
+    []       |== (_ `Until` _)   = False
 
 data TimelineProblem p = TimelineProblem
   { always        :: CNF (Definitional p)

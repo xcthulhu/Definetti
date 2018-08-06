@@ -3,22 +3,22 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Logic.TemporalTest (temporalTests)
+module Logic.Tasty.Suite.TemporalTest (temporalTests)
 where
 
-import           Data.List.NonEmpty      (NonEmpty)
--- import           Data.Monoid             ((<>))
-import           Test.QuickCheck         (Arbitrary (arbitrary), oneof)
-import           Test.Tasty              (TestTree, testGroup)
-import           Test.Tasty.HUnit        (testCase, (@?=))
--- import           Test.Tasty.QuickCheck   (testProperty)
+import           Data.List.NonEmpty    (NonEmpty)
+import           Data.Monoid           ((<>))
+import           Test.QuickCheck       (Arbitrary (arbitrary), oneof, within)
+import           Test.Tasty            (TestTree, testGroup)
+import           Test.Tasty.HUnit      (testCase, (@?=))
+import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Propositional     (Propositional ((:&&:), Falsum, Not, Proposition, Verum))
-import           Logic.Semantics         (ModelSearch (findModel),
-                                          Semantics ((|=)))
-import           Logic.Temporal          (Temporal (Always, Until), before)
+import           Logic.Propositional   (Propositional ((:&&:), Falsum, Not, Proposition, Verum))
+import           Logic.Semantics       (ModelSearch (findModel),
+                                        Semantics ((|=)))
+import           Logic.Temporal        (Temporal (Always, Until), before)
 
-import           Logic.PropositionalTest (Atom, AtomModel, bound)
+import           Logic.TestAtom        (Atom, AtomModel, bound)
 
 
 instance Arbitrary p => Arbitrary (Temporal (Propositional p)) where
@@ -46,23 +46,21 @@ temporalLogicTests = testGroup
   [a,b,c] = Proposition . bound <$> ['a', 'b', 'c']
 
 
--- temporalSemanticsQC :: TestTree
--- temporalSemanticsQC = testGroup
---   "Temporal Semantics Laws"
---   [ testProperty
---         (  "Forall f: `fmap (|= f) (findModel f)"
---         <> " == fmap (const True) (findModel f)`"
---         )
---       $ \f -> fmap (|= f) (findModel' f) == fmap (const True) (findModel' f)
---   ]
---  where
---   findModel' :: Propositional (Temporal (Propositional (Atom Char)))
---              -> Maybe [AtomModel Char]
---   findModel' = findModel
+temporalSemanticsQC :: TestTree
+temporalSemanticsQC =
+  testGroup "Temporal Semantics Laws"
+  [ testProperty
+        (  "Forall f: `fmap (|= f) (findModel f)"
+        <> " == fmap (const True) (findModel f)`"
+        )
+      $ within 100000000
+      $ \f -> let m = findModel' f
+              in fmap (|= f) m == fmap (const True) m
+  ]
 
 temporalTests :: TestTree
 temporalTests = testGroup
   "Temporal Tests"
   [ temporalLogicTests
-  -- , temporalSemanticsQC
+  , temporalSemanticsQC
   ]

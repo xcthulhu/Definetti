@@ -3,23 +3,24 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Logic.ProbabilityTest (probabilityTests)
+module Logic.Tasty.Suite.ProbabilityTest (probabilityTests)
 where
 
-import           Control.Monad           (liftM2)
-import           Data.Monoid             ((<>))
-import           Test.QuickCheck         (Arbitrary (arbitrary), Gen, oneof,
-                                          sized)
-import           Test.Tasty              (TestTree, testGroup)
-import           Test.Tasty.HUnit        (testCase, (@?), (@?=))
-import           Test.Tasty.QuickCheck   (testProperty)
+import           Control.Monad         (liftM2)
+import           Data.List.NonEmpty    (NonEmpty)
+import           Data.Monoid           ((<>))
+import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, oneof,
+                                        sized)
+import           Test.Tasty            (TestTree, testGroup)
+import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
+import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Probability       (Probability ((:*), (:+), Const, Pr), ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
-import           Logic.Propositional     (Propositional ((:&&:), (:->:), (:||:), Not, Proposition))
-import           Logic.Semantics         (ModelSearch (findModel),
-                                          Semantics ((|=)))
+import           Logic.Probability     (Probability ((:*), (:+), Const, Pr), ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
+import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Not, Proposition))
+import           Logic.Semantics       (ModelSearch (findModel),
+                                        Semantics ((|=)))
 
-import           Logic.PropositionalTest (Atom, AtomModel, bound)
+import           Logic.TestAtom        (Atom, AtomModel, bound)
 
 
 instance Arbitrary p => Arbitrary (Probability p) where
@@ -42,7 +43,7 @@ instance Arbitrary p => Arbitrary (ProbabilityInequality p) where
                     , liftM2 (:>=) arbitrary arbitrary
                     ]
 
-findModel' :: ProbabilityInequality (Atom Char) -> Maybe (AtomModel Char)
+findModel' :: ProbabilityInequality (Atom Char) -> Maybe (NonEmpty (AtomModel Char))
 findModel' = findModel
 
 probabilityTheoryQC :: TestTree

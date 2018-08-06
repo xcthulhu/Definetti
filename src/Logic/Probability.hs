@@ -7,6 +7,7 @@
 module Logic.Probability
   ( Probability (Pr, Const, (:+), (:*))
   , ProbabilityInequality ((:<), (:>), (:>=), (:<=))
+  , count
   ) where
 
 import           Control.Applicative         (Alternative, empty, pure, (<|>))
@@ -14,9 +15,10 @@ import           Control.Arrow               (first, second, (***))
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
 import           Data.List                   (partition)
+import           Data.List.NonEmpty          (NonEmpty)
 import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
-import           Data.Ratio                  (denominator)
+import           Data.Ratio                  (denominator, (%))
 
 import           Logic.Propositional         (Propositional (Not))
 import           Logic.Propositional.DPLL    (CNF, ConstrainedModelSearch)
@@ -37,14 +39,16 @@ data ProbabilityInequality p = (Probability p) :<  (Probability p)
                              | (Probability p) :<= (Probability p)
                              deriving (Ord, Show, Eq)
 
--- TODO: This is wrong, use probability functions
-evalProbability :: Semantics d p => d -> Probability p -> Rational
+count :: (Foldable t, Integral n) => (a -> Bool) -> t a -> n
+count p = foldr (\a c -> if p a then c + 1 else c) 0
+
+evalProbability :: Semantics d p => NonEmpty d -> Probability p -> Rational
 evalProbability _ (Const c) = c
-evalProbability m (Pr p)    = if m |= p then 1 else 0
+evalProbability m (Pr p)    = count (|= p) m % (toInteger . length) m
 evalProbability m (x :+ y)  = evalProbability m x + evalProbability m y
 evalProbability m (a :* x)  = a * evalProbability m x
 
-instance Semantics d p => Semantics d (ProbabilityInequality p) where
+instance Semantics d p => Semantics (NonEmpty d) (ProbabilityInequality p) where
   m |= (a :< b)  = evalProbability m a <  evalProbability m b
   m |= (a :<= b) = evalProbability m a <= evalProbability m b
   m |= (a :>= b) = evalProbability m a >= evalProbability m b
@@ -151,14 +155,15 @@ maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
 -- \end{align*}
 -- \]
 --
--- where \(\hat{x}\) is \(x\) times the least common multiple of the denominators of all of coefficients and constants.
+-- where \(\hat{x}\) is \(x\) times the least common multiple
+-- of the denominators of all of coefficients and constants.
 instance ( Ord p
          , MonadPlus m
          , ConstrainedModelSearch d p m )
-         => ModelSearch d (GTSummationNormalForm (Propositional p)) m
+         => ModelSearch (NonEmpty d) (GTSummationNormalForm (Propositional p)) m
   where
-    findModel GTSummationNormalForm {..} = maxSatN (floor k) clauses
-      where
+    findModel GTSummationNormalForm {..} =
+      pure <$> maxSatN (floor k) clauses where
         allTerms = leftHandTerms <> rightHandTerms
         denominatorProduct =
           fromIntegral . foldr lcm 1 . fmap (denominator . snd) $ allTerms
@@ -173,6 +178,6 @@ instance ( Ord p
 instance ( Ord p
          , MonadPlus m
          , ConstrainedModelSearch d p m )
-         => ModelSearch d (ProbabilityInequality p) m
+         => ModelSearch (NonEmpty d) (ProbabilityInequality p) m
   where
     findModel = findModel . summationNormalForm
