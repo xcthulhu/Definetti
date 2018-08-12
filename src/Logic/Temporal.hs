@@ -32,7 +32,7 @@ newtype PositiveTemporal p =
   PositiveTemporal (Temporal (CNF (Definitional p))) deriving (Ord, Show, Eq)
 
 newtype TemporalFormula v p =
-  TemporalFormula (Propositional (FreeVars v (Temporal p)))
+  TemporalFormula (Propositional (FreeVars v (Temporal p))) deriving (Ord, Show, Eq)
 
 until :: Propositional p
        -> Propositional p
@@ -76,6 +76,12 @@ instance ( Ord v
       transform (Neg (Atom (Bound (q `Until` r)))) =
         mkTempLit (q `Until` (Not q :&&: Not r)) <> mkTempLit (Always (Not r))
 
+instance ( Ord v
+         , Semantics d p )
+         => Semantics (FreeModel v (NonEmpty d))
+                      (TemporalFormula v (Propositional p)) where
+  m |= (TemporalFormula p) = m |= p
+
 instance ( Ord p
          , MonadPlus m
          , ConstrainedModelSearch d p m)
@@ -98,6 +104,8 @@ instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
     ms'      |== (Always p)      = all (|= p) ms'
     (m':ms') |== u@(p `Until` q) = m' |= q || (m' |= p && ms' |== u)
     []       |== (_ `Until` _)   = False
+
+
 
 pickOne :: [a] -> [(a,[a])]
 pickOne []     = []
