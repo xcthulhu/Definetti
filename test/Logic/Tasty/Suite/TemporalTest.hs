@@ -13,20 +13,21 @@ import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Propositional   (Propositional ((:&&:), Falsum, Not, Proposition, Verum))
+import           Logic.Propositional   (FreeModel, Propositional ((:&&:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
-import           Logic.Temporal        (Temporal (Always, Until), before)
+import           Logic.Temporal        (Temporal (Always, Until),
+                                        TemporalFormula (TemporalFormula),
+                                        before)
 
 import           Logic.TestAtom        (Atom, AtomModel, bound)
 
 
-instance Arbitrary p => Arbitrary (Temporal (Propositional p)) where
+instance Arbitrary p => Arbitrary (Temporal p) where
   arbitrary = oneof [ Until <$> arbitrary <*> arbitrary, Always <$> arbitrary]
 
-findModel' :: Propositional (Temporal (Propositional (Atom Char)))
-           -> Maybe (NonEmpty (AtomModel Char))
-findModel' = findModel
+instance (Arbitrary p, Arbitrary v) => Arbitrary (TemporalFormula v p) where
+  arbitrary = TemporalFormula <$> arbitrary
 
 temporalLogicTests :: TestTree
 temporalLogicTests = testGroup
@@ -44,7 +45,9 @@ temporalLogicTests = testGroup
   ]
  where
   [a,b,c] = Proposition . bound <$> ['a', 'b', 'c']
-
+  findModel' :: Propositional (Temporal (Propositional (Atom Char)))
+           -> Maybe (NonEmpty (AtomModel Char))
+  findModel' = findModel
 
 temporalSemanticsQC :: TestTree
 temporalSemanticsQC =
@@ -54,9 +57,12 @@ temporalSemanticsQC =
         <> " == fmap (const True) (findModel f)`"
         )
       $ within 100000000
-      $ \f -> let m = findModel' f
+      $ \f -> let m = findModel'' f
               in fmap (|= f) m == fmap (const True) m
-  ]
+  ] where
+    findModel'' :: TemporalFormula Char (Propositional (Atom Char))
+                -> Maybe (FreeModel Char (NonEmpty (AtomModel Char)))
+    findModel'' = findModel
 
 temporalTests :: TestTree
 temporalTests = testGroup
