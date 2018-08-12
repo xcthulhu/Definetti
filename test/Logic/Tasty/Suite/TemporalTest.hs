@@ -8,7 +8,7 @@ where
 
 import           Data.List.NonEmpty    (NonEmpty)
 import           Data.Monoid           ((<>))
-import           Test.QuickCheck       (Arbitrary (arbitrary), oneof, within)
+import           Test.QuickCheck       (Arbitrary (arbitrary), oneof)
 import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
@@ -56,7 +56,6 @@ temporalSemanticsQC =
         (  "Forall f: `fmap (|= f) (findModel f)"
         <> " == fmap (const True) (findModel f)`"
         )
-      $ within 100000000
       $ \f -> let m = findModel'' f
               in fmap (|= f) m == fmap (const True) m
   ] where
