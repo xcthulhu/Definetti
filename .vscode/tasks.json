@@ -27,6 +27,12 @@
       "args": ["--run", "\"cabal configure --enable-tests\""]
     },
     {
+      "label": "configure with coverage",
+      "type": "shell",
+      "command": "nix-shell",
+      "args": ["--run", "\"cabal configure --enable-tests --enable-coverage\""]
+    },
+    {
       "label": "build",
       "type": "shell",
       "command": "cabal",
