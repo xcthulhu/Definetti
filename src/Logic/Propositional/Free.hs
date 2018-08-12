@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module Logic.Propositional.Free (FreeVars (Bound, Free), FreeModel (FreeModel)) where
 
 import           Control.Applicative      (Alternative (empty))
 import           Control.Monad            (guard)
 import qualified Data.Set
-import           Logic.Propositional.DPLL (ConstraintProblem,
-                                           Literal (Neg, Pos))
+import           Logic.Propositional.DPLL (Literal (Neg, Pos))
 import           Logic.Semantics          (ConstrainedModelSearch (findConstrainedModel),
                                            Semantics ((|=)))
 
@@ -19,22 +19,22 @@ instance Functor (FreeVars v) where
   fmap _ (Free v)  = Free v
   fmap f (Bound b) = Bound (f b)
 
-data FreeModel v d = FreeModel (Data.Set.Set v) d
+data FreeModel v d = FreeModel
+  { freeVariablesSetToTrue :: Data.Set.Set v
+  , model                  :: d
+  }
 
-instance ( Ord a
+instance ( Ord v
          , Semantics d p
-         ) => Semantics (FreeModel a d) (ConstraintProblem (FreeVars a p)) where
-  (|=) (FreeModel freeVariablesSetToTrue m) = all checkedToBeTrue
-    where
-      checkedToBeTrue (Neg l)         = not (checkedToBeTrue (Pos l))
-      checkedToBeTrue (Pos (Bound p)) = m |= p
-      checkedToBeTrue (Pos (Free v))  = v `Data.Set.member` freeVariablesSetToTrue
+         ) => Semantics (FreeModel v d) (FreeVars v p) where
+  FreeModel {..} |= (Bound p) = model |= p
+  FreeModel {..} |= (Free v)  =  v `Data.Set.member` freeVariablesSetToTrue
 
-instance ( Ord a
+instance ( Ord v
          , Ord p
          , Alternative f
          , ConstrainedModelSearch d p f
-         ) => ConstrainedModelSearch (FreeModel a d) (FreeVars a p) f where
+         ) => ConstrainedModelSearch (FreeModel v d) (FreeVars v p) f where
   findConstrainedModel clause =
     FreeModel <$> maybe empty pure maybeFreeVariablesSetToTrue
               <*> findConstrainedModel boundLiterals
