@@ -20,6 +20,12 @@ import           Logic.Semantics     (ConstrainedModelSearch (findConstrainedMod
 
 newtype Urelement a = Urelement a deriving (Ord, Eq, Show)
 
+instance Arbitrary p => Arbitrary (Urelement p) where
+  arbitrary = Urelement <$> arbitrary
+
+instance (Arbitrary v, Arbitrary p) => Arbitrary (FreeVars v p) where
+  arbitrary = oneof [Bound <$> arbitrary, Free <$> arbitrary]
+
 type Atom a = FreeVars Char (Urelement a)
 
 bound :: a -> Atom a
@@ -27,10 +33,6 @@ bound = Bound . Urelement
 
 type AtomModel p = Data.Set.Set (Atom p)
 
-instance Arbitrary p => Arbitrary (Atom p) where
-  arbitrary = oneof [ bound <$> arbitrary
-                    , Free <$> arbitrary
-                    ]
 
 instance Arbitrary p => Arbitrary (Propositional p) where
   arbitrary = sized sizedArbitraryProposition where
