@@ -13,9 +13,13 @@ import           Logic.Semantics          (ConstrainedModelSearch (findConstrain
                                            Semantics ((|=)))
 
 
-data FreeVars a p = Bound p | Free a deriving (Ord, Eq, Show)
+data FreeVars v p =  Free v | Bound p deriving (Ord, Eq, Show)
 
-data FreeModel a d = FreeModel (Data.Set.Set a) d
+instance Functor (FreeVars v) where
+  fmap _ (Free v)  = Free v
+  fmap f (Bound b) = Bound (f b)
+
+data FreeModel v d = FreeModel (Data.Set.Set v) d
 
 instance ( Ord a
          , Semantics d p
@@ -31,8 +35,9 @@ instance ( Ord a
          , Alternative f
          , ConstrainedModelSearch d p f
          ) => ConstrainedModelSearch (FreeModel a d) (FreeVars a p) f where
-  findConstrainedModel clause = FreeModel <$> maybe empty pure maybeFreeVariablesSetToTrue
-                                          <*> findConstrainedModel boundLiterals
+  findConstrainedModel clause =
+    FreeModel <$> maybe empty pure maybeFreeVariablesSetToTrue
+              <*> findConstrainedModel boundLiterals
     where
       maybeFreeVariablesSetToTrue =
         fst <$> Data.Set.foldr tryAddFreeLit initFreeLits clause

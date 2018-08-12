@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Logic.Tasty.Suite.TemporalTest (temporalTests)
+module Logic.Tasty.Suite.TemporalTest (temporalTests, temporalSemanticsQC)
 where
 
 import           Data.List.NonEmpty    (NonEmpty)

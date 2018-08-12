@@ -125,7 +125,7 @@ weightedChoose clauses totalWeight k
   | k > totalWeight             = empty
   | k <= 0                      = pure []
   | k == totalWeight            = pure (map fst clauses)
-  | [] <- clauses               = error "This should never happen"
+  | [] <- clauses               = error "Clauses should never be empty"
   | ((x, weight):xs) <- clauses =
   let totalWeight' = totalWeight - weight
   in weightedChoose xs totalWeight' k <|>
