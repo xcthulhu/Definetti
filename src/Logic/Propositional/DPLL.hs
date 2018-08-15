@@ -136,7 +136,7 @@ instance ( Ord l
       dpll sequent@(assms :|-: clauses) = do
         -- Fail early if falsum is a subgoal
         guard $ not (mempty `Data.Set.member` clauses)
-        case concatMap Data.Set.toList clauses of
+        case (Data.Set.toList . Data.Foldable.fold) clauses of
           -- If DPLL has terminated, call findModel
           []  -> findConstrainedModel assms
           -- Otherwise try various tactics for resolving goals

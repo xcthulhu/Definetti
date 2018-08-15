@@ -24,8 +24,6 @@ library
   other-modules:        Logic.Propositional.Tseitin
                       , Logic.Propositional.DPLL
                       , Logic.Propositional.Free
-                      , Logic.Temporal.Common
-                      , Logic.Temporal.Optimized
   ghc-options:          -Wall -Werror
 
 executable shepherd

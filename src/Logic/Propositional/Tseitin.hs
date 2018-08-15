@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -11,8 +12,7 @@ module Logic.Propositional.Tseitin
                   , Proposition
                   , Verum )
   , tseitinTransform
-  , Definitional
-  , Definitional' (Definition, Atom)
+  , Definitional (Definition, Atom)
   ) where
 
 import           Control.Monad            (MonadPlus)
@@ -35,7 +35,7 @@ data Propositional p = Proposition p
                      | Not (Propositional p)
                      | Verum
                      | Falsum
-                     deriving (Ord, Show, Eq)
+                     deriving (Ord, Show, Eq, Functor)
 
 -- | Semantics for the Propositional Calculus
 instance Semantics d p => Semantics d (Propositional p) where
@@ -60,26 +60,19 @@ instance Semantics d p => Semantics d (Propositional p) where
 --   This is a _referentially transparent_ means of creating labels,
 --   however it differs from Harrison's method (which uses a counter as state).
 
-data Definitional' d p =
-    Definition d                -- ^ a literal that defines a subterm
-  | Atom p                      -- ^ a literal for an atomic proposition
+data Definitional p =
+    Definition (Propositional p)  -- ^ a literal that defines a subterm
+  | Atom p                        -- ^ a literal for an atomic proposition
     deriving (Ord, Show, Eq)
-
-type Definitional p = Definitional' (Propositional p) p
-
-instance Functor (Definitional' d) where
-  fmap _ (Definition d) = Definition d
-  fmap f (Atom a)       = Atom (f a)
 
 -- | ConstrainedModelSearch for Conjunctions of Literals of Definitional Atoms
 -- When finding a model for a conjunction of literals of definitional atoms,
 -- model search proceeds ignoring the definitional atoms.
 
 instance ( Ord p
-         , Ord q
          , MonadPlus m
          , ConstrainedModelSearch d p m )
-         => ConstrainedModelSearch d (Definitional' q p) m
+         => ConstrainedModelSearch d (Definitional p) m
   where
     findConstrainedModel definitionals = findConstrainedModel atoms
       where

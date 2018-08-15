@@ -64,9 +64,7 @@ propositionalIdentitiesHUnit = testGroup
           ) @? "Could not find a model for `a :&&: (b :||: c)`"
   ]
  where
-  a = Proposition . bound $ 'a'
-  b = Proposition . bound $ 'b'
-  c = Proposition . bound $ 'c'
+  [a,b,c] = Proposition . bound <$> ['a', 'b', 'c']
 
 propositionalSemanticsQC :: TestTree
 propositionalSemanticsQC = testGroup
