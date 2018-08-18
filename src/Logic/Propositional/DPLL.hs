@@ -16,7 +16,7 @@ module Logic.Propositional.DPLL
 
 import           Control.Applicative (Alternative, empty, pure)
 import           Control.Monad       (MonadPlus, guard, msum)
-import qualified Data.Foldable       (fold)
+import qualified Data.Foldable       (concatMap, fold)
 import           Data.Monoid         (mempty, (<>))
 import           Data.Set            ((\\))
 import qualified Data.Set            (Set, filter, intersection, map, member,
@@ -136,7 +136,7 @@ instance ( Ord l
       dpll sequent@(assms :|-: clauses) = do
         -- Fail early if falsum is a subgoal
         guard $ not (mempty `Data.Set.member` clauses)
-        case (Data.Set.toList . Data.Foldable.fold) clauses of
+        case Data.Foldable.concatMap Data.Set.toList clauses of
           -- If DPLL has terminated, call findModel
           []  -> findConstrainedModel assms
           -- Otherwise try various tactics for resolving goals

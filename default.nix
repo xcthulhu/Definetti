@@ -12,4 +12,10 @@ let
 
   pkgs = import src {};
 
-in pkgs.haskell.packages.${compiler}.callCabal2nix "definetti" ./. { }
+  package = pkgs.haskell.packages.${compiler}.callCabal2nix "definetti" ./. { };
+
+in
+
+  pkgs.haskell.lib.overrideCabal package (oldAttrs: {
+    testSystemDepends = [ pkgs.glpk ];
+  })

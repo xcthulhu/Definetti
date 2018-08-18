@@ -7,6 +7,7 @@ module Logic.Tasty.Suite.TemporalTest (temporalTests, temporalSemanticsQC)
 where
 
 import           Data.List.NonEmpty    (NonEmpty)
+import           Prelude               hiding (until)
 import           Test.QuickCheck       (Arbitrary (arbitrary), oneof)
 import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?=))
@@ -15,7 +16,7 @@ import           Test.Tasty.QuickCheck (testProperty)
 import           Logic.Propositional   (FreeModel, FreeVars (Bound), Propositional ((:&&:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
-import           Logic.Temporal        (Temporal (Always, Until), before)
+import           Logic.Temporal        (Temporal (Always, Until), before, until)
 
 import           Logic.TestAtom        (Atom, AtomModel, bound)
 
@@ -26,6 +27,11 @@ instance Arbitrary p => Arbitrary (Temporal (Propositional p)) where
 findModel' :: Propositional (FreeVars Char (Temporal (Propositional (Atom Char))))
            -> Maybe (FreeModel Char (NonEmpty (AtomModel Char)))
 findModel' = findModel
+
+until' :: Propositional (Atom Char)
+        -> Propositional (Atom Char)
+        -> Propositional (FreeVars Char (Temporal (Propositional (Atom Char))))
+a `until'` b = Bound <$> (a `until` b)
 
 before' :: Propositional (Atom Char)
         -> Propositional (Atom Char)
@@ -40,7 +46,11 @@ slowTemporalLogicTests :: TestTree
 slowTemporalLogicTests = testGroup
   "Temporal Logic Tests"
   [
-    testCase "`a before b` AND `b before c` implies `a before c`" $
+    testCase "`~a until (a AND b)` AND `~a until (a AND c)` implies `Verum until (b AND c)`" $
+    ((|= (Verum `until'` (b :&&: c))) <$>
+     findModel' (     (Not a `until'` (a :&&: b))
+                 :&&: (Not a `until'` (a :&&: c)))) @?= Just True
+  , testCase "`a before b` AND `b before c` implies `a before c`" $
     ((|= (a `before'` c)) <$>
      findModel' ((a `before'` b) :&&: (b `before'` c))) @?= Just True
   , testCase "Should not find a model for `Not (Always Verum)`" $

@@ -7,9 +7,11 @@
 module Logic.Temporal (Temporal (Until, Always), before, until) where
 
 import           Control.Applicative         (Alternative ((<|>)))
+import           Control.Arrow               (first, second)
 import           Control.Monad               (MonadPlus, msum)
+import qualified Data.Foldable               (fold)
 import           Data.List.NonEmpty          (NonEmpty ((:|)), reverse)
-import           Data.Monoid                 (mempty, (<>))
+import           Data.Monoid                 (Monoid, mappend, mempty, (<>))
 import qualified Data.Set
 import           Prelude                     hiding (reverse, until)
 
@@ -24,8 +26,8 @@ import           Logic.Semantics             (Semantics, (|=))
 data Temporal p = p `Until` p | Always p deriving (Ord, Show, Eq, Functor)
 
 until :: Propositional p
-       -> Propositional p
-       -> Propositional (Temporal (Propositional p))
+      -> Propositional p
+      -> Propositional (Temporal (Propositional p))
 a `until` b = Proposition (a `Until` b)
 
 -- Expression for `before` operator based on temporal logic primitives
@@ -36,22 +38,32 @@ a `before` b = (Not b `until` a) :&&: (Verum `until` b)
 
 data Until_ a = a `Until_` a deriving (Functor)
 
-data TimelineProblem p = TimelineProblem
-  { always :: CNF (Definitional p)
-  , untils :: [Until_ (CNF (Definitional p))]
-  }
-
-
 instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
   (|=) (m:|ms) = (|==) (m:ms) where
     ms'      |== (Always p)      = all (|= p) ms'
     (m':ms') |== u@(p `Until` q) = m' |= q || (m' |= p && ms' |== u)
     []       |== (_ `Until` _)   = False
 
-pickOne :: [a] -> [(a,[a])]
-pickOne []     = []
-pickOne [x]    = [(x,[])]
-pickOne (x:xs) = (x,xs) : [(y,x:ys) | (y,ys) <- pickOne xs]
+-- singlePick :: [a] -> [(a,[a])]
+-- singlePick []     = mempty
+-- singlePick [x]    = pure (x,[])
+-- singlePick (x:xs) = (x,xs) : (second (x:) <$> singlePick xs)
+
+instance Monoid a => Monoid (Until_ a) where
+  mempty = mempty `Until_` mempty
+  (a `Until_` b) `mappend` (c `Until_` d) = (a <> c) `Until_` (b <> d)
+
+-- TODO: Try DList here for performance
+multiPick :: [a] -> [([a], [a])]
+multiPick = filter (not . null . fst) . multiPick' where
+  multiPick' []  = pure ([], [])
+  multiPick' (x:xs) = let choices = multiPick' xs in
+    (first (x:) <$> choices) <> (second (x:) <$> choices)
+
+data TimelineProblem p = TimelineProblem
+  { always :: CNF (Definitional p)
+  , untils :: [Until_ (CNF (Definitional p))]
+  }
 
 instance ( Ord p
          , MonadPlus m
@@ -61,10 +73,11 @@ instance ( Ord p
     reverse <$> ((:|) <$> initialState <*> search always untils) where
       initialState           = findModel always
       search _ []            = pure mempty
-      search always' untils' = msum $ tryTimeline always' <$> pickOne untils'
-      tryTimeline always' (p `Until_` q, untils') = do
-        t <- findModel (always' <> q)
-        ts <- search (always' <> p) untils'
+      search always' untils' = msum $ tryTimeline always' <$> multiPick untils'
+      tryTimeline always' (choice, rest) = do
+        let (p `Until_` q) = Data.Foldable.fold choice
+        t  <- findModel (always' <> q)
+        ts <- search (always' <> p) rest
         pure (t:ts)
 
 data Choice p = Choice p p deriving Functor
