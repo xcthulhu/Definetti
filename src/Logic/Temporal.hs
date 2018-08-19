@@ -3,13 +3,13 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TupleSections         #-}
 
 module Logic.Temporal (Temporal (Until, Always), before, until) where
 
 import           Control.Applicative         (Alternative ((<|>)))
-import           Control.Arrow               (first, second)
+import           Control.Arrow               (second)
 import           Control.Monad               (MonadPlus, msum)
-import qualified Data.Foldable               (fold)
 import           Data.List.NonEmpty          (NonEmpty ((:|)), reverse)
 import           Data.Monoid                 (Monoid, mappend, mempty, (<>))
 import qualified Data.Set
@@ -44,21 +44,14 @@ instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
     (m':ms') |== u@(p `Until` q) = m' |= q || (m' |= p && ms' |== u)
     []       |== (_ `Until` _)   = False
 
--- singlePick :: [a] -> [(a,[a])]
--- singlePick []     = mempty
--- singlePick [x]    = pure (x,[])
--- singlePick (x:xs) = (x,xs) : (second (x:) <$> singlePick xs)
-
 instance Monoid a => Monoid (Until_ a) where
   mempty = mempty `Until_` mempty
   (a `Until_` b) `mappend` (c `Until_` d) = (a <> c) `Until_` (b <> d)
 
--- TODO: Try DList here for performance
-multiPick :: [a] -> [([a], [a])]
-multiPick = filter (not . null . fst) . multiPick' where
-  multiPick' []  = pure ([], [])
-  multiPick' (x:xs) = let choices = multiPick' xs in
-    (first (x:) <$> choices) <> (second (x:) <$> choices)
+singlePick :: [a] -> [(a,[a])]
+singlePick []     = mempty
+singlePick [x]    = pure (x,[])
+singlePick (x:xs) = (x,xs) : (second (x:) <$> singlePick xs)
 
 data TimelineProblem p = TimelineProblem
   { always :: CNF (Definitional p)
@@ -71,14 +64,20 @@ instance ( Ord p
          => ModelSearch (NonEmpty d) (TimelineProblem p) m where
   findModel TimelineProblem {..} =
     reverse <$> ((:|) <$> initialState <*> search always untils) where
-      initialState           = findModel always
-      search _ []            = pure mempty
-      search always' untils' = msum $ tryTimeline always' <$> multiPick untils'
-      tryTimeline always' (choice, rest) = do
-        let (p `Until_` q) = Data.Foldable.fold choice
-        t  <- findModel (always' <> q)
-        ts <- search (always' <> p) rest
-        pure (t:ts)
+      initialState = findModel always
+      search _ [] = pure mempty
+      search always' untils' =
+        msum [ tryNowAndLater id us =<< mkModel u
+             | (u, us) <- singlePick untils' ] where
+          mkModel u@(_ `Until_` q) = (u,) <$> findModel (q <> always')
+          tryNowAndLater laters [] m = mkTimeline (laters []) m
+          tryNowAndLater laters (u0:rest) m@(u,_) =
+            do
+              m' <- mkModel (u <> u0)
+              tryNowAndLater laters rest m' <|> mkTimeline (laters rest) m'
+            <|> tryNowAndLater ((u0:) . laters) rest m
+          mkTimeline untils'' (p `Until_` _, t) =
+            (t:) <$> search (always' <> p) untils''
 
 data Choice p = Choice p p deriving Functor
 
