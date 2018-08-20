@@ -13,13 +13,12 @@ import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Propositional   (FreeModel, FreeVars (Bound, Free), Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
+import           Logic.Propositional   (FreeModel, FreeVars (Bound), Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
 import           Logic.Temporal        (Temporal (Always, Until), before, until)
 
-import           Logic.TestAtom        (Atom, AtomModel, Urelement (Urelement),
-                                        bound)
+import           Logic.TestAtom        (Atom, AtomModel, bound, free)
 
 
 instance Arbitrary p => Arbitrary (Temporal (Propositional p)) where
@@ -46,9 +45,16 @@ always' = Proposition . Bound . Always
 slowTemporalLogicTests :: TestTree
 slowTemporalLogicTests = testGroup
   "Temporal Logic Tests"
-  [ testCase "Failing Generative Test" $
-    let p = Not (Proposition (Bound (Proposition (Free '\1015488') `Until` (Proposition (Bound (Urelement '\412955')) :->: Proposition (Bound (Urelement '\n')))))) :&&: (Not Falsum :->: Not ((Not (Proposition (Free '\211796') :->: Proposition (Bound ((Not (((Proposition (Bound (Urelement '+')) :->: Not ((Proposition (Bound (Urelement 'W')) :->: Proposition (Free 'K')) :||: Proposition (Bound (Urelement '\946835')))) :&&: Falsum) :&&: Not ((Falsum :&&: (Verum :||: (Proposition (Bound (Urelement '`')) :->: Proposition (Free '\DC2')))) :&&: Proposition (Bound (Urelement 'Z')))) :||: Not (Not Falsum)) `Until` Verum))) :&&: Falsum) :&&: Verum))
+  [ testCase "No model for `~(Verum until Verum)`" $
+    findModel' (Not (Verum `until'` Verum)) @?= Nothing
+  , testCase "((Verum until Verum) :->: y) implies y" $
+    (|= y) <$> findModel' ((Verum `until'` Verum) :->: y) @?= Just True
+  , testCase "Not ((Verum until Verum) :->: y) implies (Not y)" $
+    (|= Not y) <$> findModel' (Not ((Verum `until'` Verum) :->: y)) @?= Just True
+  , testCase "Can model `Not (a `until'` (b :->: c)) :&&: (Not (x :->: (Verum `until'` Verum)) :||: Verum)`" $
+    let p = Not (a `until'` (b :->: c)) :&&: (Not (x :->: (Verum `until'` Verum)) :||: Verum)
     in ((|= p) <$> findModel' p @?= Just True)
+    -- Not (Not ((((Proposition (Free 'q') :&&: Proposition (Bound (Not (Proposition (Bound (Urelement 'd')) :->: Verum :&&: (Proposition (Free '\'') :||: (Proposition (Free 't') :||: (Proposition (Bound (Urelement '\98120')) :->: Proposition (Free '~'))))) `Until` Not (Proposition(Bound (Urelement 'y')))))) :&&: Proposition (Free '\EM')) :||: Falsum) :||: (Verum :->: Proposition (Bound (Always (Proposition (Free '#'))))))) :->: Falsum
   , testCase "`~a until (a AND b)` AND `~a until (a AND c)` implies `Verum until (b AND c)`" $
     ((|= (Verum `until'` (b :&&: c))) <$>
      findModel' (     (Not a `until'` (a :&&: b))
@@ -69,7 +75,9 @@ slowTemporalLogicTests = testGroup
     findModel' (Not (always' Verum) :&&: Verum) @?= Nothing
   ]
  where
-  [a,b,c,d] = Proposition . bound <$> ['a', 'b', 'c', 'd']
+  x,y :: Propositional (FreeVars Char (Temporal (Propositional (Atom Char))))
+  [x,y] = free <$> ['x','y']
+  [a,b,c,d] = bound <$> ['a','b','c','d']
 
 temporalSemanticsQC :: TestTree
 temporalSemanticsQC =

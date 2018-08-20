@@ -12,7 +12,7 @@ import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
+import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Verum))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
 import           Logic.TestAtom
@@ -64,7 +64,7 @@ propositionalIdentitiesHUnit = testGroup
           ) @? "Could not find a model for `a :&&: (b :||: c)`"
   ]
  where
-  [a,b,c] = Proposition . bound <$> ['a', 'b', 'c']
+  [a,b,c] = bound <$> ['a', 'b', 'c']
 
 propositionalSemanticsQC :: TestTree
 propositionalSemanticsQC = testGroup

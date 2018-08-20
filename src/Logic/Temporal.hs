@@ -58,28 +58,32 @@ data TimelineProblem p = TimelineProblem
   , untils :: [Until_ (CNF (Definitional p))]
   }
 
+timelineSearch :: (Monoid p, ModelSearch a p f, MonadPlus f)
+               => p
+               -> [Until_ p]
+               -> f [a]
+timelineSearch _ [] = pure mempty
+timelineSearch always untils = msum [ tryNowAndLater id us =<< mkModel u
+                                    | (u, us) <- singlePick untils ] where
+  mkModel u@(_ `Until_` q) = (u,) <$> findModel (q <> always)
+  -- Use a DList-type optimization for laters to avoid appending
+  tryNowAndLater laters [] m = mkTimeline (laters []) m
+  tryNowAndLater laters (u0:rest) m@(u,_) =
+    do { m' <- mkModel (u <> u0)
+       ; mkTimeline (laters rest) m' <|> tryNowAndLater laters rest m' }
+    <|>
+    tryNowAndLater (laters . (u0:)) rest m
+  mkTimeline untils' (p `Until_` _, t) =
+    (t:) <$> timelineSearch (always <> p) untils'
+
 instance ( Ord p
          , MonadPlus m
          , ConstrainedModelSearch d p m )
          => ModelSearch (NonEmpty d) (TimelineProblem p) m where
-  findModel TimelineProblem {..} =
-    reverse <$> ((:|) <$> initialState <*> search always untils) where
-      initialState = findModel always
-      search _ [] = pure mempty
-      search always' untils' =
-        msum [ tryNowAndLater id us =<< mkModel u
-             | (u, us) <- singlePick untils' ] where
-          mkModel u@(_ `Until_` q) = (u,) <$> findModel (q <> always')
-          -- Below, we use a DList-type optimization for laters to avoid appending
-          tryNowAndLater laters [] m = mkTimeline (laters []) m
-          tryNowAndLater laters (u0:rest) m@(u,_) =
-            tryNowAndLater ((u0:) . laters) rest m
-            <|>
-            do
-              m' <- mkModel (u <> u0)
-              mkTimeline (laters rest) m' <|> tryNowAndLater laters rest m'
-          mkTimeline untils'' (p `Until_` _, t) =
-            (t:) <$> search (always' <> p) untils''
+  findModel TimelineProblem {..} = do
+    initialState <- findModel always
+    timeline     <- timelineSearch always untils
+    pure $ reverse (initialState :| timeline)
 
 data Choice p = Choice p p deriving Functor
 

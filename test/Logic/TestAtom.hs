@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Logic.TestAtom (Atom, AtomModel, bound, Urelement (Urelement))
+module Logic.TestAtom (Atom, AtomModel, bound, free, Urelement (Urelement))
 where
 
 import           Control.Applicative (Alternative, empty, pure)
@@ -28,8 +28,11 @@ instance (Arbitrary v, Arbitrary p) => Arbitrary (FreeVars v p) where
 
 type Atom p = FreeVars Char (Urelement p)
 
-bound :: p -> Atom p
-bound = Bound . Urelement
+free :: Char -> Propositional (FreeVars Char p)
+free = Proposition . Free
+
+bound :: p -> Propositional (Atom p)
+bound = Proposition . Bound . Urelement
 
 type AtomModel p = FreeModel Char (Data.Set.Set (Urelement p))
 

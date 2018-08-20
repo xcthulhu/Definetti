@@ -16,7 +16,7 @@ import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
 import           Logic.Probability     (Probability ((:*), (:+), Const, Pr), ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
-import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Not, Proposition))
+import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Not))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
 
@@ -101,9 +101,8 @@ probabilityTheoryQC = testGroup
     in (|= p) <$> findModel' p @?= Just True
   ]
  where
-  a = Proposition . bound $ 'a'
-  b = Proposition . bound $ 'b'
-  noModel    = (Nothing ==) . findModel'
+  [a,b]       = bound <$> ['a', 'b']
+  noModel     = (Nothing ==) . findModel'
   someModel p = ((|= p) <$> findModel' p) == Just True
 
 probabilityInequalitySemanticsQC :: TestTree
