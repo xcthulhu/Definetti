@@ -50,6 +50,11 @@ slowTemporalLogicTests = testGroup
     ((|= (Verum `until'` (b :&&: c))) <$>
      findModel' (     (Not a `until'` (a :&&: b))
                  :&&: (Not a `until'` (a :&&: c)))) @?= Just True
+  , testCase "`~a until (a AND b)` AND `~a until (a AND c)` AND `~a until (a AND d)` implies `Verum until (b AND c AND d)`" $
+    ((|= (Verum `until'` (b :&&: c :&&: d))) <$>
+     findModel' (     (Not a `until'` (a :&&: b))
+                 :&&: (Not a `until'` (a :&&: c))
+                 :&&: (Not a `until'` (a :&&: d)))) @?= Just True
   , testCase "`a before b` AND `b before c` implies `a before c`" $
     ((|= (a `before'` c)) <$>
      findModel' ((a `before'` b) :&&: (b `before'` c))) @?= Just True
@@ -61,7 +66,7 @@ slowTemporalLogicTests = testGroup
     findModel' (Not (always' Verum) :&&: Verum) @?= Nothing
   ]
  where
-  [a,b,c] = Proposition . bound <$> ['a', 'b', 'c']
+  [a,b,c,d] = Proposition . bound <$> ['a', 'b', 'c', 'd']
 
 temporalSemanticsQC :: TestTree
 temporalSemanticsQC =
