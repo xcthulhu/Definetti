@@ -13,12 +13,13 @@ import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
-import           Logic.Propositional   (FreeModel, FreeVars (Bound), Propositional ((:&&:), Falsum, Not, Proposition, Verum))
+import           Logic.Propositional   (FreeModel, FreeVars (Bound, Free), Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics       (ModelSearch (findModel),
                                         Semantics ((|=)))
 import           Logic.Temporal        (Temporal (Always, Until), before, until)
 
-import           Logic.TestAtom        (Atom, AtomModel, bound)
+import           Logic.TestAtom        (Atom, AtomModel, Urelement (Urelement),
+                                        bound)
 
 
 instance Arbitrary p => Arbitrary (Temporal (Propositional p)) where
@@ -45,8 +46,10 @@ always' = Proposition . Bound . Always
 slowTemporalLogicTests :: TestTree
 slowTemporalLogicTests = testGroup
   "Temporal Logic Tests"
-  [
-    testCase "`~a until (a AND b)` AND `~a until (a AND c)` implies `Verum until (b AND c)`" $
+  [ testCase "Failing Generative Test" $
+    let p = Not (Proposition (Bound (Proposition (Free '\1015488') `Until` (Proposition (Bound (Urelement '\412955')) :->: Proposition (Bound (Urelement '\n')))))) :&&: (Not Falsum :->: Not ((Not (Proposition (Free '\211796') :->: Proposition (Bound ((Not (((Proposition (Bound (Urelement '+')) :->: Not ((Proposition (Bound (Urelement 'W')) :->: Proposition (Free 'K')) :||: Proposition (Bound (Urelement '\946835')))) :&&: Falsum) :&&: Not ((Falsum :&&: (Verum :||: (Proposition (Bound (Urelement '`')) :->: Proposition (Free '\DC2')))) :&&: Proposition (Bound (Urelement 'Z')))) :||: Not (Not Falsum)) `Until` Verum))) :&&: Falsum) :&&: Verum))
+    in ((|= p) <$> findModel' p @?= Just True)
+  , testCase "`~a until (a AND b)` AND `~a until (a AND c)` implies `Verum until (b AND c)`" $
     ((|= (Verum `until'` (b :&&: c))) <$>
      findModel' (     (Not a `until'` (a :&&: b))
                  :&&: (Not a `until'` (a :&&: c)))) @?= Just True

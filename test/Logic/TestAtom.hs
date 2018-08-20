@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
-module Logic.TestAtom (Atom, AtomModel, bound)
+module Logic.TestAtom (Atom, AtomModel, bound, Urelement (Urelement))
 where
 
 import           Control.Applicative (Alternative, empty, pure)
