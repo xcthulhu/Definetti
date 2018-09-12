@@ -1,13 +1,11 @@
-{ bootstrap ? import <nixpkgs> {}, compiler ? "ghc822" }:
+{ compiler ? "ghc822" }:
 
 let
 
-  nixpkgs = builtins.fromJSON (builtins.readFile ./nixpkgs.json);
-
-  src = bootstrap.fetchFromGitHub {
+  src = (import <nixpkgs> {}).fetchFromGitHub {
     owner = "NixOS";
     repo  = "nixpkgs";
-    inherit (nixpkgs) rev sha256;
+    inherit (builtins.fromJSON (builtins.readFile ./nixpkgs.json)) rev sha256;
   };
 
   pkgs = import src {};
@@ -17,5 +15,6 @@ let
 in
 
   pkgs.haskell.lib.overrideCabal package (oldAttrs: {
+    # TODO: Maybe don't need this?
     testSystemDepends = [ pkgs.glpk ];
   })

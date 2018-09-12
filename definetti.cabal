@@ -2,7 +2,7 @@ name:                definetti
 version:             0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/githubuser/definetti#readme
+-- homepage:            https://github.com/githubuser/definetti#readme
 author:              Matthew Doty
 maintainer:          matthew.wampler.doty@gmail.com
 copyright:           2018 Matthew Doty
@@ -11,16 +11,20 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
+Flag library-only
+  Default:       False
+
 library
   hs-source-dirs:       src
   build-depends:        base        >= 4.7 && < 5
                       , containers  >= 0.5 && < 0.6
+                      -- , glpk-hs     >= 0.5 && < 0.6
   default-language:     Haskell2010
-  default-extensions:   Safe
   exposed-modules:      Logic.Propositional
                       , Logic.Probability
                       , Logic.Semantics
                       , Logic.Temporal
+                      , Logic.LinearProgramming
   other-modules:        Logic.Propositional.Tseitin
                       , Logic.Propositional.DPLL
                       , Logic.Propositional.Free
@@ -29,12 +33,13 @@ library
 executable shepherd
   main-is:              Main.hs
   hs-source-dirs:       app
-  default-extensions:   Safe
   default-language:     Haskell2010
   build-depends:        definetti
                       , base                 >= 4.7  && < 5
                       , optparse-applicative >= 0.13 && < 0.15
   ghc-options:          -Wall -Werror
+  if flag(library-only)
+    Buildable: False
 
 test-suite definetti-test
   type:                 exitcode-stdio-1.0
@@ -42,10 +47,10 @@ test-suite definetti-test
   main-is:              TastyTests.hs
   build-depends:        definetti
                       , base             >= 4.7  && < 5
-                      , QuickCheck       >= 2.9  && < 2.11
+                      , QuickCheck       >= 2.9  && < 2.12
                       , containers       >= 0.5  && < 0.6
-                      , tasty            >= 0.11 && < 0.12
-                      , tasty-quickcheck >= 0.8  && < 0.10
+                      , tasty            >= 1.1  && < 1.2
+                      , tasty-quickcheck >= 0.8  && < 0.11
                       , tasty-hunit      >= 0.9  && < 1.0
   ghc-options:          -Wall -threaded -rtsopts -with-rtsopts=-N
   other-modules:        Logic.Tasty.Suite.PropositionalTest

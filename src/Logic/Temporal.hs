@@ -4,14 +4,20 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards       #-}
 
-module Logic.Temporal (Temporal (Until, Always), before, until) where
+module Logic.Temporal
+  ( Temporal(Until, Always)
+  , before
+  , until
+  )
+where
 
 import           Control.Applicative         (Alternative ((<|>)))
 import           Control.Arrow               (first, second)
 import           Control.Monad               (MonadPlus, msum)
 import qualified Data.Foldable               (fold)
 import           Data.List.NonEmpty          (NonEmpty ((:|)), reverse)
-import           Data.Monoid                 (Monoid, mappend, mempty, (<>))
+import           Data.Monoid                 (Monoid, mappend, mempty)
+import           Data.Semigroup              (Semigroup, (<>))
 import qualified Data.Set
 import           Prelude                     hiding (reverse, until)
 
@@ -25,15 +31,17 @@ import           Logic.Semantics             (Semantics, (|=))
 -- | Temporal logic primitives
 data Temporal p = p `Until` p | Always p deriving (Ord, Show, Eq, Functor)
 
-until :: Propositional p
-      -> Propositional p
-      -> Propositional (Temporal (Propositional p))
+until
+  :: Propositional p
+  -> Propositional p
+  -> Propositional (Temporal (Propositional p))
 a `until` b = Proposition (a `Until` b)
 
 -- Expression for `before` operator based on temporal logic primitives
-before :: Propositional p
-       -> Propositional p
-       -> Propositional (Temporal (Propositional p))
+before
+  :: Propositional p
+  -> Propositional p
+  -> Propositional (Temporal (Propositional p))
 a `before` b = (Not b `until` a) :&&: (Verum `until` b)
 
 data Until_ a = a `Until_` a deriving (Functor)
@@ -49,16 +57,21 @@ instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
 -- singlePick [x]    = pure (x,[])
 -- singlePick (x:xs) = (x,xs) : (second (x:) <$> singlePick xs)
 
+instance Semigroup a => Semigroup (Until_ a) where
+  (a `Until_` b) <> (c `Until_` d) = (a <> c) `Until_` (b <> d)
+
 instance Monoid a => Monoid (Until_ a) where
   mempty = mempty `Until_` mempty
-  (a `Until_` b) `mappend` (c `Until_` d) = (a <> c) `Until_` (b <> d)
+  (a `Until_` b) `mappend` (c `Until_` d) = (a `mappend` c) `Until_` (b `mappend` d)
 
 -- TODO: Try DList here for performance
 multiPick :: [a] -> [([a], [a])]
-multiPick = filter (not . null . fst) . multiPick' where
-  multiPick' []  = pure ([], [])
-  multiPick' (x:xs) = let choices = multiPick' xs in
-    (first (x:) <$> choices) <> (second (x:) <$> choices)
+multiPick = filter (not . null . fst) . multiPick'
+ where
+  multiPick' [] = pure ([], [])
+  multiPick' (x : xs) =
+    let choices = multiPick' xs
+    in  (first (x :) <$> choices) <> (second (x :) <$> choices)
 
 data TimelineProblem p = TimelineProblem
   { always :: CNF (Definitional p)

@@ -1,2 +1,1 @@
-{ bootstrap ? import <nixpkgs> {} }:
-(import ./default.nix { inherit bootstrap; }).env
+(import ./default.nix {}).env
