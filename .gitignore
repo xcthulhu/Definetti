@@ -3,6 +3,7 @@ TAGS
 .dir-locals.el
 dist/
 dist-newstyle/
-cabal.project.local
+/*.local
+/*.local~
 result
 stack.yaml
