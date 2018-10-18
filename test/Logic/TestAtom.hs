@@ -3,6 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
+-- This file defines `Atom`s suitable for testing various logic fragments
+
 module Logic.TestAtom (Atom, AtomModel, bound, free, Urelement (Urelement))
 where
 
@@ -16,7 +18,6 @@ import           Logic.Propositional (FreeModel, FreeVars (Bound, Free),
                                       Propositional ((:&&:), (:->:), (:||:), Falsum, Not, Proposition, Verum))
 import           Logic.Semantics     (ConstrainedModelSearch (findConstrainedModel),
                                       Semantics ((|=)))
-
 
 newtype Urelement a = Urelement a deriving (Ord, Eq, Show)
 
