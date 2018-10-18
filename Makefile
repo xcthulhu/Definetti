@@ -3,21 +3,30 @@
 build:
 	cabal build
 
+configure:
+	nix-shell --pure --run 'cabal configure --enable-tests'
+
+configure-with-coverage:
+	nix-shell --pure --run 'cabal configure --enable-tests --enable-coverage'
+
+configure-app:
+	nix-shell --pure --run 'cabal configure -fenable-cli-app --enable-tests'
+
 test:
 	cabal test --show-details=streaming
 
+hlint:
+	cabal test hlint --show-details=streaming
+
 test-continuous:
-	make configure-repl
-	nix-shell --run 'ghcid -c "cabal repl definetti-test" --test "Main.main"'
+	nix-shell --pure --run 'ghcid -c "cabal repl definetti-test" --test "Main.main"'
 
-configure:
-	nix-shell --run 'cabal configure --enable-tests'
+app: dist/build/shepherd/shepherd
 
-configure-with-coverage:
-	nix-shell --run 'cabal configure --enable-tests --enable-coverage'
+dist/build/shepherd/shepherd: $(shell find src -name "*.hs") $(shell find app -name "*.hs")
+	make configure-app
+	cabal build shepherd
 
-configure-repl:
-	nix-shell --run 'cabal configure -flibrary-only --enable-tests'
 
 clean:
 	cabal clean

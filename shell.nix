@@ -1,10 +1,12 @@
 {pkgs ? import <nixpkgs> {}}:
 let
-  package = pkgs.haskell.lib.overrideCabal (import ./default.nix {}) (oldAttrs: {
+  package = pkgs.haskell.lib.overrideCabal (import ./default.nix) (oldAttrs: {
     testSystemDepends = let oldTestSystemDepends = if oldAttrs ? testSystemDepends
                                                    then oldAttrs.testSystemDepends
                                                    else [];
-                        in [ pkgs.haskellPackages.ghcid ] ++ oldTestSystemDepends;
+                        in oldTestSystemDepends ++ [ pkgs.haskellPackages.ghcid
+                                                     pkgs.haskellPackages.cabal-install
+                                                   ];
   });
 in
   package.env
