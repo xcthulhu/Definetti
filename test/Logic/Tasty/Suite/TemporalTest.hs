@@ -44,7 +44,7 @@ always' = Proposition . Bound . Always
 
 slowTemporalLogicTests :: TestTree
 slowTemporalLogicTests = testGroup
-  "Temporal Logic Tests"
+  "Temporal Logic Identities"
   [ testCase "No model for `~(Verum until Verum)`" $
     findModel' (Not (Verum `until'` Verum)) @?= Nothing
   , testCase "((Verum until Verum) :->: y) implies y" $
@@ -54,7 +54,6 @@ slowTemporalLogicTests = testGroup
   , testCase "Can model `Not (a `until'` (b :->: c)) :&&: (Not (x :->: (Verum `until'` Verum)) :||: Verum)`" $
     let p = Not (a `until'` (b :->: c)) :&&: (Not (x :->: (Verum `until'` Verum)) :||: Verum)
     in ((|= p) <$> findModel' p @?= Just True)
-    -- Not (Not ((((Proposition (Free 'q') :&&: Proposition (Bound (Not (Proposition (Bound (Urelement 'd')) :->: Verum :&&: (Proposition (Free '\'') :||: (Proposition (Free 't') :||: (Proposition (Bound (Urelement '\98120')) :->: Proposition (Free '~'))))) `Until` Not (Proposition(Bound (Urelement 'y')))))) :&&: Proposition (Free '\EM')) :||: Falsum) :||: (Verum :->: Proposition (Bound (Always (Proposition (Free '#'))))))) :->: Falsum
   , testCase "`~a until (a AND b)` AND `~a until (a AND c)` implies `Verum until (b AND c)`" $
     ((|= (Verum `until'` (b :&&: c))) <$>
      findModel' (     (Not a `until'` (a :&&: b))
