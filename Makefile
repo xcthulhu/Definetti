@@ -4,13 +4,13 @@ build:
 	cabal build
 
 configure:
-	nix-shell --pure --run 'cabal configure --enable-tests'
+	nix-shell --run 'cabal configure --enable-tests'
 
 configure-with-coverage:
-	nix-shell --pure --run 'cabal configure --enable-tests --enable-coverage'
+	nix-shell --run 'cabal configure --enable-tests --enable-coverage'
 
 configure-app:
-	nix-shell --pure --run 'cabal configure -fenable-cli-app --enable-tests'
+	nix-shell --run 'cabal configure -fenable-cli-app --enable-tests'
 
 test:
 	cabal test --show-details=streaming
@@ -19,7 +19,7 @@ hlint:
 	cabal test hlint --show-details=streaming
 
 test-continuous:
-	nix-shell --pure --run 'ghcid -c "cabal repl definetti-test" --test "Main.main"'
+	nix-shell --run 'ghcid -c "cabal repl definetti-test" --test "Main.main"'
 
 app: dist/build/shepherd/shepherd
 

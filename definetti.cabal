@@ -19,8 +19,9 @@ library
   build-depends:        base            >= 4.7 && < 5
                       , containers      >= 0.5 && < 0.6
                       , safe-exceptions >= 0.1 && < 0.2
+                      , transformers    >= 0.5 && < 0.6
                       , unliftio        >= 0.2 && < 0.3
-                      , z3              >= 4.2 && < 4.4
+                      , z3              >= 4.3 && < 4.4
   default-language:     Haskell2010
   exposed-modules:      Logic.Propositional
                       , Logic.Probability
@@ -59,7 +60,7 @@ test-suite definetti-test
                       , safe-exceptions  >= 0.1 && < 0.2
                       , transformers     >= 0.5 && < 0.6
                       , unliftio         >= 0.2 && < 0.3
-                      , z3               >= 4.0 && < 4.4
+                      , z3               >= 4.3 && < 4.4
   ghc-options:          -Wall -threaded -rtsopts -with-rtsopts=-N
   other-modules:        Logic.Tasty.Suite.LinearProgrammingTest
                       , Logic.Tasty.Suite.PropositionalTest
