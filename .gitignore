@@ -1,9 +1,7 @@
 .stack-work/
 TAGS
-.dir-locals.el
 dist/
 dist-newstyle/
 /*.local
-/*.local~
+*~
 result
-stack.yaml

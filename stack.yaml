@@ -1,0 +1,13 @@
+resolver: lts-12.15
+
+packages:
+- .
+
+extra-deps:
+ - git: https://github.com/IagoAbal/haskell-z3
+   commit: f3cf151fa32628742fc7db6a1834afcf99a63c35
+
+nix:
+  enable: true
+  shell-file: shell.nix
+  #packages: [z3]
