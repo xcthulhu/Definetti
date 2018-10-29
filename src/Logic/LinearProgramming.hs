@@ -15,14 +15,15 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Foldable          (foldMap, toList)
 import           Data.List              (nub)
 import qualified Data.Map               as Map
-import           Data.Maybe             (catMaybes)
+import           Data.Maybe             (fromMaybe)
 import           Data.Ratio             (Rational, denominator)
 import           Data.Traversable       (sequence)
-import           Z3.Monad
+import           Text.Printf            (printf)
 import qualified Z3.Monad               as Z3
 
 import           Logic.Propositional    (ConstrainedModelSearch (findConstrainedModel),
                                          Literal (Neg, Pos))
+import           Logic.Semantics        (Semantics ((|=)))
 
 
 infix 7 :+:
@@ -79,13 +80,10 @@ z3ExtractIPVarMap intProg =
 data MissingVariableKeyException k v = MissingVariableKeyException k (Map.Map k v)
 
 instance Show k => Show (MissingVariableKeyException k v) where
-  show (MissingVariableKeyException missingVar varMap) = unwords
-    [
-      "Missing variable key:"
-    , show missingVar
-    , "possible variable values in IPVarMap:"
-    , show $ Map.keys varMap
-    ]
+  show (MissingVariableKeyException missingVar varMap) =
+    printf "Missing variable key: \"%s\"; possible variables in map: %s"
+          (show missingVar)
+          (show $ Map.keys varMap)
 
 instance (Show k, Typeable k, Typeable v) => Exception (MissingVariableKeyException k v)
 
@@ -119,6 +117,15 @@ z3IPLinearInequality varMap (x :<=: y) = do
   z3y <- z3IPSumPlusConst varMap y
   z3x `Z3.mkLe` z3y
 
+z3EvalIPVarMap
+  :: Z3.MonadZ3 z3
+  => Map.Map String Z3.AST
+  -> Z3.Model
+  -> z3 (Maybe (Map.Map String Integer))
+z3EvalIPVarMap varMap model = fmap Map.fromList . sequence <$> forM
+  (Map.toList varMap)
+  (\(k, v) -> (fmap . fmap) (k, ) (Z3.evalInt model v))
+
 z3SolveIP
   :: Z3.MonadZ3 z3
   => [LinearInequality Integer]
@@ -126,10 +133,7 @@ z3SolveIP
 z3SolveIP intProg = do
   varMap <- z3ExtractIPVarMap intProg
   Z3.assert =<< Z3.mkAnd =<< forM intProg (z3IPLinearInequality varMap)
-  fmap (join . snd) . Z3.withModel $ \m -> do
-    pairs <- forM (Map.toList varMap)
-      $ \(k, v) -> (fmap . fmap) (k, ) (Z3.evalInt m v)
-    pure . fmap Map.fromList . sequence $ pairs
+  fmap (join . snd) . Z3.withModel $ z3EvalIPVarMap varMap
 
 liftMaybe :: MonadPlus m => Maybe a -> m a
 liftMaybe = maybe mzero pure
@@ -139,43 +143,31 @@ solveIP
   :: (MonadIO m, MonadPlus m)
   => [LinearInequality Integer]
   -> m (Map.Map String Integer)
--- solveIP = liftMaybe <=< liftIO . Z3.evalZ3 . z3SolveIP
-solveIP _ = liftMaybe <=< liftIO . evalZ3 $ do
-  q1 <- mkFreshIntVar "q1"
-  q2 <- mkFreshIntVar "q2"
-  q3 <- mkFreshIntVar "q3"
-  q4 <- mkFreshIntVar "q4"
-  _1 <- mkInteger 1
-  _4 <- mkInteger 4
-  -- the ith-queen is in the ith-row.
-  -- qi is the column of the ith-queen
-  assert =<< mkAnd =<< sequence
-    [ mkLe _1 q1, mkLe q1 _4  -- 1 <= q1 <= 4
-    , mkLe _1 q2, mkLe q2 _4
-    , mkLe _1 q3, mkLe q3 _4
-    , mkLe _1 q4, mkLe q4 _4
-    ]
-  -- different columns
-  assert =<< mkDistinct [q1,q2,q3,q4]
-  -- avoid diagonal attacks
-  assert =<< mkNot =<< mkOr =<< sequence
-    [ diagonal 1 q1 q2  -- diagonal line of attack between q1 and q2
-    , diagonal 2 q1 q3
-    , diagonal 3 q1 q4
-    , diagonal 1 q2 q3
-    , diagonal 2 q2 q4
-    , diagonal 1 q3 q4
-    ]
-  -- check and get solution
-  model <- fmap snd $ withModel $ \m ->
-    catMaybes <$> mapM (evalInt m) [q1,q2,q3,q4]
-  pure $ model >> Nothing
-  where mkAbs x = do
-          _0 <- mkInteger 0
-          join $ mkIte <$> mkLe _0 x <*> pure x <*> mkUnaryMinus x
-        diagonal d c c' =
-          join $ mkEq <$> (mkAbs =<< mkSub [c',c]) <*> (mkInteger d)
+solveIP = liftMaybe <=< liftIO . Z3.evalZ3 . z3SolveIP
 
+-- | Evaluates a `SumPlusConstant n` data structure
+--   Variables no present in model default to value @0@
+evalSumPlusConstant :: Num n => Map.Map String n -> SumPlusConstant n -> n
+evalSumPlusConstant m (summation :+: c) =
+  sum
+      [ coeff * fromMaybe 0 (Map.lookup variable m)
+      | (coeff, variable) <- summation
+      ]
+    + c
+
+instance (Ord n, Num n) => Semantics (Map.Map String n) (LinearInequality n) where
+  m |= (lhs :<: rhs) = evalSumPlusConstant m lhs < evalSumPlusConstant m rhs
+  m |= (lhs :<=: rhs) = evalSumPlusConstant m lhs <= evalSumPlusConstant m rhs
+
+instance (Ord n, Num n) => Semantics (Map.Map String n) [LinearInequality n] where
+  (|=) m = all (m |=)
+
+-- instance Semantics d p => Semantics d (ConstraintProblem p) where
+--   m |= clauses = all (m |=) posClauses && all (not . (m |=)) negClauses
+--     where
+--       clauseList = toList clauses
+--       posClauses = [c | Pos c <- clauseList]
+--       negClauses = [c | Neg c <- clauseList]
 
 -- | Find an exact solution to a linear programming problem
 --   (with rational coefficients) by converting it into an

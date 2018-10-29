@@ -5,14 +5,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Logic.Propositional.DPLL
-  ( Literal (Pos, Neg)
+  ( Literal(Pos, Neg)
   , ConstraintProblem
   , HornClause
   , CNF
-  , ModelSearch (findModel)
-  , ConstrainedModelSearch (findConstrainedModel)
-  , Semantics ((|=))
-  ) where
+  , ModelSearch(findModel)
+  , ConstrainedModelSearch(findConstrainedModel)
+  , Semantics((|=))
+  )
+where
 
 import           Control.Applicative (Alternative, empty, pure)
 import           Control.Monad       (MonadPlus, guard, msum)
@@ -96,7 +97,7 @@ unitPropogate literals (assms :|-: clauses) =
 --   (either all `Pos` or all `Neg`).
 --   This rule finds all pure literals and performs unit propogation on them
 pureRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
-pureRule sequent@(_:|-:clauses) =
+pureRule sequent@(_ :|-: clauses) =
   let
     sign (Pos _) = True
     sign (Neg _) = False
@@ -114,7 +115,7 @@ pureRule sequent@(_:|-:clauses) =
 --   If a clause `{x}` occurs in a CNF, add the clause to the assumptions
 --   and perform unit propogation to eliminate the literal `x`
 oneRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
-oneRule sequent@(_:|-:clauses) =
+oneRule sequent@(_ :|-: clauses) =
   let isSingleton c = Data.Set.size c == 1
       singletons = (Data.Foldable.fold . Data.Set.filter isSingleton) clauses
   in  if null singletons
