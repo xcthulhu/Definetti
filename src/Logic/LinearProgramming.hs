@@ -1,29 +1,51 @@
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
 module Logic.LinearProgramming where
 
-import           Prelude                hiding (sequence)
+import           Prelude                 hiding ( sequence )
 
-import           Control.Arrow          (first)
-import           Control.Exception.Safe (Exception, Typeable, throwIO)
-import           Control.Monad          (MonadPlus, forM, join, mzero, (<=<))
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Foldable          (foldMap, toList)
-import           Data.List              (nub)
-import qualified Data.Map               as Map
-import           Data.Maybe             (fromMaybe)
-import           Data.Ratio             (Rational, denominator)
-import           Data.Traversable       (sequence)
-import           Text.Printf            (printf)
-import qualified Z3.Monad               as Z3
+import           Control.Arrow                  ( first )
+import           Control.Exception.Safe         ( Exception
+                                                , Typeable
+                                                , throwIO
+                                                )
+import           Control.Monad                  ( MonadPlus
+                                                , forM
+                                                , join
+                                                , mzero
+                                                , when
+                                                , (<=<)
+                                                )
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
+import           Data.Foldable                  ( foldMap
+                                                , toList
+                                                )
+import           Data.List                      ( isPrefixOf
+                                                , nub
+                                                )
+import qualified Data.Map                      as Map
+import           Data.Maybe                     ( fromMaybe )
+import           Data.Ratio                     ( Rational
+                                                , denominator
+                                                )
+import           Data.Traversable               ( sequence )
+import           Text.Printf                    ( printf )
+import qualified Z3.Monad                      as Z3
 
-import           Logic.Propositional    (ConstrainedModelSearch (findConstrainedModel),
-                                         Literal (Neg, Pos))
-import           Logic.Semantics        (Semantics ((|=)))
+import           Logic.Propositional            ( ConstrainedModelSearch
+                                                  ( findConstrainedModel
+                                                  )
+                                                , ConstraintProblem
+                                                , Literal(Neg, Pos)
+                                                )
+import           Logic.Semantics                ( Semantics((|=)) )
 
 
 infix 7 :+:
@@ -72,26 +94,52 @@ extractIPVarNames = nub . (extractLinearInequalityVars =<<)
 type IPVarMap = Map.Map String Z3.AST
 type IPSolution = Map.Map String Integer
 
+data IllegalVariableException =
+  IllegalVariableException { illegalVariableName   :: String
+                           , illegalVariablePrefix :: String
+                           }
+
+instance Show IllegalVariableException where
+  show (IllegalVariableException {illegalVariableName, illegalVariablePrefix}) =
+    printf "Illegal variable name: %s; variables cannot start with %s"
+           (show illegalVariableName)
+           (show illegalVariablePrefix)
+
+instance Exception IllegalVariableException
+
+illegalIPVariablePrefix :: String
+illegalIPVariablePrefix = "@@@"
+
 z3ExtractIPVarMap :: Z3.MonadZ3 z3 => [LinearInequality Integer] -> z3 IPVarMap
 z3ExtractIPVarMap intProg =
-  Map.fromList <$> forM (extractIPVarNames intProg) mkFreshIntVarPair
-  where mkFreshIntVarPair v = (v, ) <$> Z3.mkFreshIntVar v
+  fmap Map.fromList . forM (extractIPVarNames intProg) $ \varName -> do
+    when (illegalIPVariablePrefix `isPrefixOf` varName) $ (liftIO . throwIO)
+      IllegalVariableException
+        { illegalVariableName   = varName
+        , illegalVariablePrefix = illegalIPVariablePrefix
+        }
+    (varName, ) <$> Z3.mkFreshIntVar varName
 
-data MissingVariableKeyException k v = MissingVariableKeyException k (Map.Map k v)
+data MissingVariableKeyException k v =
+  MissingVariableKeyException { missingVariableKey :: k
+                              , variableMap        :: Map.Map k v
+                              }
 
 instance Show k => Show (MissingVariableKeyException k v) where
-  show (MissingVariableKeyException missingVar varMap) =
-    printf "Missing variable key: \"%s\"; possible variables in map: %s"
-          (show missingVar)
-          (show $ Map.keys varMap)
+  show MissingVariableKeyException {missingVariableKey, variableMap} =
+    printf "Missing variable key: %s; possible variables in map: %s"
+          (show missingVariableKey)
+          (show $ Map.keys variableMap)
 
 instance (Show k, Typeable k, Typeable v) => Exception (MissingVariableKeyException k v)
 
 lookupOrThrow :: MonadIO m => String -> IPVarMap -> m Z3.AST
-lookupOrThrow v m = maybe
-  (liftIO . throwIO $ MissingVariableKeyException v m)
-  pure
-  (Map.lookup v m)
+lookupOrThrow varName varMap = case Map.lookup varName varMap of
+  Just value -> pure value
+  Nothing    -> liftIO . throwIO $ MissingVariableKeyException
+    { missingVariableKey = varName
+    , variableMap        = varMap
+    }
 
 z3CoeffProd :: Z3.MonadZ3 z3 => IPVarMap -> Integer -> String -> z3 Z3.AST
 z3CoeffProd varMap a v = do
@@ -135,15 +183,15 @@ z3SolveIP intProg = do
   Z3.assert =<< Z3.mkAnd =<< forM intProg (z3IPLinearInequality varMap)
   fmap (join . snd) . Z3.withModel $ z3EvalIPVarMap varMap
 
-liftMaybe :: MonadPlus m => Maybe a -> m a
-liftMaybe = maybe mzero pure
+fmapaybe :: MonadPlus m => Maybe a -> m a
+fmapaybe = maybe mzero pure
 
 -- | Solve an Integer programming problem
 solveIP
   :: (MonadIO m, MonadPlus m)
   => [LinearInequality Integer]
   -> m (Map.Map String Integer)
-solveIP = liftMaybe <=< liftIO . Z3.evalZ3 . z3SolveIP
+solveIP = fmapaybe <=< liftIO . Z3.evalZ3 . z3SolveIP
 
 -- | Evaluates a `SumPlusConstant n` data structure
 --   Variables no present in model default to value @0@
@@ -162,12 +210,12 @@ instance (Ord n, Num n) => Semantics (Map.Map String n) (LinearInequality n) whe
 instance (Ord n, Num n) => Semantics (Map.Map String n) [LinearInequality n] where
   (|=) m = all (m |=)
 
--- instance Semantics d p => Semantics d (ConstraintProblem p) where
---   m |= clauses = all (m |=) posClauses && all (not . (m |=)) negClauses
---     where
---       clauseList = toList clauses
---       posClauses = [c | Pos c <- clauseList]
---       negClauses = [c | Neg c <- clauseList]
+instance (Ord n, Num n) => Semantics (Map.Map String n) (ConstraintProblem (LinearInequality n)) where
+  m |= clauses = all (m |=) posClauses && all (not . (m |=)) negClauses
+    where
+      clauseList = toList clauses
+      posClauses = [c | Pos c <- clauseList]
+      negClauses = [c | Neg c <- clauseList]
 
 -- | Find an exact solution to a linear programming problem
 --   (with rational coefficients) by converting it into an
