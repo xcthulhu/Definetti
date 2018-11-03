@@ -64,4 +64,26 @@ linearProgrammingTests = testGroup
       model <- findConstrainedModel' $ Set.fromList [ Pos aLTb, Pos bLTc ]
       (|= aLTc) <$> model @?= Just True
       (|= cLEa) <$> model @?= Just False
+  , testCase "Exists a model s.t. 1 < X && X < 2" $ do
+      let c1 = []         :+: 0 :<: [(1, "X")]     :+: 0
+          c2 = [(1, "X")] :+: 0 :<: []             :+: 2
+      model <- findConstrainedModel' $ Set.fromList [ Pos c1, Pos c2 ]
+      (|= c1) <$> model @?= Just True
+      (|= c2) <$> model @?= Just True
+  , testCase "Exists a model s.t. 1 < X && X < 2" $ do
+      let c1 = []         :+: 0 :<: [(1, "X")]     :+: 0
+          c2 = [(1, "X")] :+: 0 :<: []             :+: 1
+      model <- findConstrainedModel' $ Set.fromList [ Pos c1, Pos c2 ]
+      (|= c1) <$> model @?= Just True
+      (|= c2) <$> model @?= Just True
+  , testCase "Exists a model s.t. 0 < X && X < 1 && 0 < Y && Y < 1/2 X" $ do
+      let c1 = []         :+: 0 :<: [(1, "X")]     :+: 0
+          c2 = [(1, "X")] :+: 0 :<: []             :+: 1
+          c3 = []         :+: 0 :<: [(1, "Y")]     :+: 0
+          c4 = [(1, "Y")] :+: 0 :<: [(1 % 2, "X")] :+: 0
+      model <- findConstrainedModel' $ Set.fromList [ Pos c1, Pos c2, Pos c3, Pos c4 ]
+      (|= c1) <$> model @?= Just True
+      (|= c2) <$> model @?= Just True
+      (|= c3) <$> model @?= Just True
+      (|= c4) <$> model @?= Just True
   ]
