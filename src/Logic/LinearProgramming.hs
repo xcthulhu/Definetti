@@ -7,45 +7,25 @@
 
 module Logic.LinearProgramming where
 
-import           Prelude                 hiding ( sequence )
+import           Prelude                hiding (sequence)
 
-import           Control.Arrow                  ( first )
-import           Control.Exception.Safe         ( Exception
-                                                , Typeable
-                                                , throwIO
-                                                )
-import           Control.Monad                  ( MonadPlus
-                                                , forM
-                                                , join
-                                                , mzero
-                                                , when
-                                                , (<=<)
-                                                )
-import           Control.Monad.IO.Class         ( MonadIO
-                                                , liftIO
-                                                )
-import           Data.Foldable                  ( foldMap
-                                                , toList
-                                                )
-import           Data.List                      ( isPrefixOf
-                                                , nub
-                                                )
-import qualified Data.Map                      as Map
-import           Data.Maybe                     ( fromMaybe )
-import           Data.Ratio                     ( Rational
-                                                , denominator
-                                                )
-import           Data.Traversable               ( sequence )
-import           Text.Printf                    ( printf )
-import qualified Z3.Monad                      as Z3
+import           Control.Arrow          (first)
+import           Control.Exception.Safe (Exception, Typeable, throwIO)
+import           Control.Monad          (MonadPlus, forM, join, mzero, when,
+                                         (<=<))
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Foldable          (foldMap, toList)
+import           Data.List              (isPrefixOf, nub)
+import qualified Data.Map               as Map
+import           Data.Maybe             (fromMaybe)
+import           Data.Ratio             (Rational, denominator)
+import           Data.Traversable       (sequence)
+import           Text.Printf            (printf)
+import qualified Z3.Monad               as Z3
 
-import           Logic.Propositional            ( ConstrainedModelSearch
-                                                  ( findConstrainedModel
-                                                  )
-                                                , ConstraintProblem
-                                                , Literal(Neg, Pos)
-                                                )
-import           Logic.Semantics                ( Semantics((|=)) )
+import           Logic.Propositional    (ConstrainedModelSearch (findConstrainedModel),
+                                         ConstraintProblem, Literal (Neg, Pos))
+import           Logic.Semantics        (Semantics ((|=)))
 
 
 infix 7 :+:
