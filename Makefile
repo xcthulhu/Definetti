@@ -28,5 +28,5 @@ dist/build/shepherd/shepherd: $(shell find src -name "*.hs") $(shell find app -n
 	cabal build shepherd
 
 clean:
-	rm -rf .stack-work/
+	rm -rf .stack-work/ dist-newstyle/
 	cabal clean

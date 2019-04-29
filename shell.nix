@@ -10,10 +10,9 @@ let
     buildDepends      = let oldBuildDepends = if oldAttrs ? buildDepends
                                               then oldAttrs.buildDepends
                                               else [];
-                        in oldBuildDepends ++ [ pkgs.git 
-                                                pkgs.stack 
+                        in oldBuildDepends ++ [ pkgs.git
+                                                pkgs.stack
                                               ];
-
   });
 in
   package.env
