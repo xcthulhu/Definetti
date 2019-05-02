@@ -24,9 +24,11 @@ library
   exposed-modules:      Logic.LinearProgramming
                       , Logic.Propositional
                       , Logic.Probability
+                      , Logic.Probability.Regression
+                      , Logic.Probability.Categorical
                       , Logic.Semantics
                       , Logic.Temporal
-  other-modules:        Logic.Propositional.Tseitin
+                      , Logic.Propositional.Tseitin
                       , Logic.Propositional.DPLL
                       , Logic.Propositional.Free
   ghc-options:          -Wall -Werror

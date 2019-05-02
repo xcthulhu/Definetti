@@ -1,183 +1,187 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MonoLocalBinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Logic.Probability
-  ( Probability (Pr, Const, (:+), (:*))
-  , ProbabilityInequality ((:<), (:>), (:>=), (:<=))
-  , count
+  ( Probability(Pr, Const, (:+), (:*))
+  , ProbabilityInequality((:<), (:>), (:>=), (:<=))
+  , module Categorical
   ) where
 
-import           Control.Applicative         (Alternative, empty, pure, (<|>))
-import           Control.Arrow               (first, second, (***))
-import           Control.Monad               (MonadPlus, msum)
-import qualified Data.Foldable               (fold)
-import           Data.List                   (partition)
-import           Data.List.NonEmpty          (NonEmpty)
-import qualified Data.Map                    as Map
-import           Data.Monoid                 ((<>))
-import           Data.Ratio                  (denominator, (%))
+import qualified Logic.Probability.Categorical as Categorical
 
-import           Logic.Propositional         (Propositional (Not))
-import           Logic.Propositional.DPLL    (CNF, ConstrainedModelSearch)
-import           Logic.Propositional.Tseitin (tseitinTransform)
-import           Logic.Semantics             (ModelSearch (findModel),
-                                              Semantics ((|=)))
+import Control.Applicative (Alternative, (<|>), empty)
+import Control.Arrow ((***), first, second)
+import Control.Monad (MonadPlus, msum)
+import Data.Foldable (fold, toList)
+import Data.List (partition)
+import qualified Data.Map as Map
+import Data.Monoid ((<>))
+import Data.Ratio (denominator)
+
+import Logic.Probability.Categorical (Categorical(unCategorical))
+import Logic.Propositional (Propositional(Not))
+import Logic.Propositional.DPLL (CNF, ConstrainedModelSearch)
+import Logic.Propositional.Tseitin (tseitinTransform)
+import Logic.Semantics (ModelSearch(findModel), Semantics((|=)))
 
 -- | Probability Inequalities
-data Probability p = Pr (Propositional p)
-                   | Const Rational
-                   | (Probability p) :+ (Probability p)
-                   | Rational        :* (Probability p)
-                   deriving (Ord, Show, Eq)
+data Probability p
+  = Pr (Propositional p)
+  | Const Rational
+  | (Probability p) :+ (Probability p)
+  | Rational :* (Probability p)
+  deriving (Eq, Ord, Show)
 
-data ProbabilityInequality p = (Probability p) :<  (Probability p)
-                             | (Probability p) :>  (Probability p)
-                             | (Probability p) :>= (Probability p)
-                             | (Probability p) :<= (Probability p)
-                             deriving (Ord, Show, Eq)
+data ProbabilityInequality p
+  = (Probability p) :< (Probability p)
+  | (Probability p) :> (Probability p)
+  | (Probability p) :>= (Probability p)
+  | (Probability p) :<= (Probability p)
+  deriving (Eq, Ord, Show)
 
-count :: (Foldable t, Integral n) => (a -> Bool) -> t a -> n
-count p = foldr (\a c -> if p a then c + 1 else c) 0
-
-evalProbability :: Semantics d p => NonEmpty d -> Probability p -> Rational
+evalProbability :: Semantics d p => Categorical d -> Probability p -> Rational
 evalProbability _ (Const c) = c
-evalProbability m (Pr p)    = count (|= p) m % (toInteger . length) m
-evalProbability m (x :+ y)  = evalProbability m x + evalProbability m y
-evalProbability m (a :* x)  = a * evalProbability m x
+evalProbability m (x :+ y) = evalProbability m x + evalProbability m y
+evalProbability m (a :* x) = a * evalProbability m x
+evalProbability m (Pr p) =
+  sum [coeff | (coeff, model) <- toList $ unCategorical m, model |= p]
 
-instance Semantics d p => Semantics (NonEmpty d) (ProbabilityInequality p) where
-  m |= (a :< b)  = evalProbability m a <  evalProbability m b
+instance Semantics d p =>
+         Semantics (Categorical d) (ProbabilityInequality p) where
+  m |= (a :< b) = evalProbability m a < evalProbability m b
   m |= (a :<= b) = evalProbability m a <= evalProbability m b
   m |= (a :>= b) = evalProbability m a >= evalProbability m b
-  m |= (a :> b)  = evalProbability m a >  evalProbability m b
+  m |= (a :> b) = evalProbability m a > evalProbability m b
 
 -- | Normal form for probabilistic inequalities / Trades
 -- Represents equations of the form:
 -- `w1 * a1 + w2 * a2 + ... + C </<= v1 * b1 + v2 * b2 + ...`
 -- here `</<=` is either strict or non-strict inequality
-
-data GTSummationNormalForm a =
-  GTSummationNormalForm { leftHandTerms    :: [(a, Rational)]
-                        , leftHandConstant :: Rational
-                        , rightHandTerms   :: [(a, Rational)]
-                        , strict           :: Bool }
-
+data GTSummationNormalForm a = GTSummationNormalForm
+  { leftHandTerms :: [(a, Rational)]
+  , leftHandConstant :: Rational
+  , rightHandTerms :: [(a, Rational)]
+  , strict :: Bool
+  }
 
 add :: (Ord p, Num n) => Map.Map p n -> Map.Map p n -> Map.Map p n
 add = Map.unionWith (+)
 
-extractPropositions :: Ord p
-                    => Probability p
-                    -> Map.Map (Propositional p) Rational
-extractPropositions (Pr p)    = Map.singleton p 1
+extractPropositions ::
+     Ord p => Probability p -> Map.Map (Propositional p) Rational
+extractPropositions (Pr p) = Map.singleton p 1
 extractPropositions (Const _) = Map.empty
-extractPropositions (x :+ y)  =
-  extractPropositions x `add` extractPropositions y
-extractPropositions (a :* x)  =
-  Map.map (a *) (extractPropositions x)
+extractPropositions (x :+ y) = extractPropositions x `add` extractPropositions y
+extractPropositions (a :* x) = Map.map (a *) (extractPropositions x)
 
-extractConstantTerm :: Probability p
-                    -> Rational
-extractConstantTerm (Pr _)    = 0
+extractConstantTerm :: Probability p -> Rational
+extractConstantTerm (Pr _) = 0
 extractConstantTerm (Const d) = d
-extractConstantTerm (x :+ y)  = extractConstantTerm x + extractConstantTerm y
-extractConstantTerm (a :* x)  = a * extractConstantTerm x
+extractConstantTerm (x :+ y) = extractConstantTerm x + extractConstantTerm y
+extractConstantTerm (a :* x) = a * extractConstantTerm x
 
-summationNormalForm :: Ord p
-                    => ProbabilityInequality p
-                    -> GTSummationNormalForm (Propositional p)
-summationNormalForm (b :>  a) = summationNormalForm (a :<  b)
+summationNormalForm ::
+     Ord p => ProbabilityInequality p -> GTSummationNormalForm (Propositional p)
+summationNormalForm (b :> a) = summationNormalForm (a :< b)
 summationNormalForm (b :>= a) = summationNormalForm (a :<= b)
-summationNormalForm (a :< b)  = (summationNormalForm (a :<= b)) {strict = True}
+summationNormalForm (a :< b) = (summationNormalForm (a :<= b)) {strict = True}
 summationNormalForm (a :<= b) =
   GTSummationNormalForm
-  { leftHandTerms = lhts
-  , leftHandConstant = extractConstantTerm a - extractConstantTerm b
-  , rightHandTerms = rhts
-  , strict = False }
+    { leftHandTerms = lhts
+    , leftHandConstant = extractConstantTerm a - extractConstantTerm b
+    , rightHandTerms = rhts
+    , strict = False
+    }
   where
     x `minus` y = x `add` Map.map negate y
     weightedTerms =
       Map.toList $ extractPropositions a `minus` extractPropositions b
     (lhts, rhts) =
-        second (fmap (second negate))
-      . partition ((>0) . snd)
-      . filter ((/= 0) . snd)
-      $ weightedTerms
+      second (fmap (second negate)) .
+      partition ((> 0) . snd) . filter ((/= 0) . snd) $
+      weightedTerms
 
-
--- | Choose `k` elements of a collection of weighted elements with
---   specified total weight. In the event that all elements have weight 1,
---   this results in exactly
---   `totalWeight choose k = totalWeight! / (k!(totalWeight-k)!)`
---   possible choices.
+-- | Choose elements of a weighted collection with collective weight
+--   greater than or equal to `k` such that if any element was removed
+--   the collection would weigh less than `k`.
+--
+--   If all elements have weight 1, then
+--   `|totalWeight choose k| = totalWeight! / (k!(totalWeight-k)!)`
+--
 --   Lifted into an arbitrary `Alternative` functor;
---   using `List` results in a list of all of the possible choices.
-weightedChoose :: Alternative f
-               => [(a, Integer)]
-               -> Integer
-               -> Integer
-               -> f [a]
-weightedChoose clauses totalWeight k
-  | k > totalWeight             = empty
-  | k <= 0                      = pure []
-  | k == totalWeight            = pure (map fst clauses)
-  | [] <- clauses               = error "Clauses should never be empty"
-  | ((x, weight):xs) <- clauses =
-  let totalWeight' = totalWeight - weight
-  in weightedChoose xs totalWeight' k <|>
-     fmap (x :) (weightedChoose xs totalWeight' (k - weight))
+--   using `List` results in a list of all of the possibilities.
+weightedChoose :: Alternative f => Integer -> [(a, Integer)] -> f [a]
+weightedChoose k xs = weightedChoose' k xs (sum . fmap snd $ xs)
+  where
+    weightedChoose' ::
+         Alternative f => Integer -> [(a, Integer)] -> Integer -> f [a]
+    weightedChoose' c clauses totalWeight
+      | c > totalWeight = empty
+      | c <= 0 = pure []
+      | [] <- clauses = error "Pattern should be unreachable!"
+      | ((x, weight):clauses') <- clauses =
+        let totalWeight' = totalWeight - weight
+         in weightedChoose' c clauses' totalWeight' <|>
+            fmap (x :) (weightedChoose' (c - weight) clauses' totalWeight')
 
--- | Determine if the largest sublist of CNFs simultaneously satisfiable
---   has weight no bigger than `k`
-maxSatN :: (Ord a, MonadPlus m, ModelSearch d (CNF a) m)
-        => Integer
-        -> [(CNF a, Integer)]
-        -> m d
-maxSatN k = msum . fmap (findModel . Data.Foldable.fold) . chooseN
- where
-   totalWeight = sum . fmap snd
-   chooseN :: [(CNF a, Integer)] -> [[CNF a]]
-   chooseN xs = weightedChoose xs (totalWeight xs) (k + 1)
+-- | Find a model of some model of a group of weighted clauses
+--   in conjunctive normal form with weight greater than `k`
+weightedSatGT ::
+     (Ord a, MonadPlus m, ModelSearch d (CNF a) m)
+  => [(CNF a, Integer)]
+  -> Integer
+  -> m d
+weightedSatGT clauses k = msum . fmap (findModel . fold) $ chooseN clauses
+  where
+    chooseN :: [(CNF a, Integer)] -> [[CNF a]]
+    chooseN = weightedChoose (k + 1)
 
--- | Model search for probabilistic inequalities in 'GTSummationNormalForm'
+-- | Model search for probabilistic inequalities in
+--   'GTSummationNormalForm'
+--
 --   This makes use of the law
 --
--- \[
--- \begin{align*}
--- \Sum_{i \in I} c_i \cdot P(\phi_i) + A & \leq \Sum_{j \in J} k_j \cdot P(\psi_j) + B \\
---                                        & \equiv \\
--- \mathrm{WeightedMaxSat}(\{ (\hat{c}_i, \phi_i)\ : \ i \in I \}
---                         \cup \{ (\hat{d}_j, \psi_j)\ :\ j \in J \}) & \leq \hat{B} - \hat{A}
--- \end{align*}
--- \]
+--   ∃ P ∈ Probabilities . (∑cᵢ·P(ϕᵢ)) + A ≤ (∑kⱼ·P(ψⱼ)) + B
+--                           ≡
+--   IntegerWeightedMaxSat([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)]) > K
 --
--- where \(\hat{x}\) is \(x\) times the least common multiple
--- of the denominators of all of coefficients and constants.
-instance ( Ord p
-         , MonadPlus m
-         , ConstrainedModelSearch d p m )
-         => ModelSearch (NonEmpty d) (GTSummationNormalForm (Propositional p)) m
-  where
-    findModel GTSummationNormalForm {..} =
-      pure <$> maxSatN (floor k) clauses where
-        allTerms = leftHandTerms <> rightHandTerms
-        denominatorProduct =
-          fromIntegral . foldr lcm 1 . fmap (denominator . snd) $ allTerms
-        transform = tseitinTransform *** (floor . (denominatorProduct *))
-        transformedLeftHandSide = transform . first Not <$> leftHandTerms
-        transformedRightHandSide = transform <$> rightHandTerms
-        clauses = transformedLeftHandSide <> transformedRightHandSide
-        k =   (fromIntegral . sum . fmap snd) transformedLeftHandSide
-            + denominatorProduct * leftHandConstant
-            + if strict then 0 else 1
+-- where
+--   - Z is the least common multiple of all of the cᵢ and kⱼ.
+--   - K = ⌊(∑cᵢ + A - B )·M⌋ + 1
+--
+-- It is not necessary to solve IntegerWeightedMaxSat.
+-- It is sufficient to find some model with weight exceeding K.
+-- For that implies all IntegerWeightedMaxSat solutions
+-- are greater than K.
+--
+-- findModel returns a model of clauses with weight greater than K
+-- if possible.
+instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
+         ModelSearch (Categorical d) (GTSummationNormalForm (Propositional p)) m where
+  findModel GTSummationNormalForm { leftHandTerms
+                                  , rightHandTerms
+                                  , leftHandConstant
+                                  , strict
+                                  } = pure <$> weightedSatGT clauses k
+    where
+      allTerms = leftHandTerms <> rightHandTerms
+      listLCM = foldr lcm 1
+      m = fromIntegral . listLCM . fmap (denominator . snd) $ allTerms
+      transform = tseitinTransform *** (floor . (m *))
+      transformedLeftHandSide = transform . first Not <$> leftHandTerms
+      transformedRightHandSide = transform <$> rightHandTerms
+      clauses = transformedLeftHandSide <> transformedRightHandSide
+      k =
+        floor
+          ((fromIntegral . sum . fmap snd) transformedLeftHandSide +
+           m * leftHandConstant) +
+        if strict
+          then 0
+          else 1
 
-instance ( Ord p
-         , MonadPlus m
-         , ConstrainedModelSearch d p m )
-         => ModelSearch (NonEmpty d) (ProbabilityInequality p) m
-  where
-    findModel = findModel . summationNormalForm
+instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
+         ModelSearch (Categorical d) (ProbabilityInequality p) m where
+  findModel = findModel . summationNormalForm

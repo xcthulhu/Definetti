@@ -18,9 +18,8 @@ test:
 hlint:
 	cabal test hlint --show-details=streaming
 
-test-continuous:
-	stack build definetti:test:definetti-test
-	ghcid -c="stack ghci definetti:lib definetti:test:definetti-test --ghci-options=-fobject-code" --test ":main"
+ghcid:
+	nix-shell --run 'stack build && ghcid'
 
 app: dist/build/shepherd/shepherd
 
