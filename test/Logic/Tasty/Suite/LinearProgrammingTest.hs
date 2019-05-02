@@ -1,27 +1,31 @@
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Logic.Tasty.Suite.LinearProgrammingTest
   ( linearProgrammingTests
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad.Trans.Maybe (runMaybeT)
-import qualified Data.Map                  as Map
-import           Data.Ratio                ((%))
-import qualified Data.Set                  as Set
-import           Logic.LinearProgramming   (LinearInequality ((:<:), (:<=:)),
-                                            SumPlusConstant ((:+:)))
+import Control.Monad.Trans.Maybe (runMaybeT)
+import qualified Data.Map as Map
+import Data.Ratio ((%))
+import qualified Data.Set as Set
+import Logic.Z3.LinearProgramming
+  ( LinearInequality((:<:), (:<=:))
+  , SumPlusConstant((:+:))
+  )
 
-import           Test.Tasty                (TestTree, testGroup)
-import           Test.Tasty.HUnit          (testCase, (@?=))
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit ((@?=), testCase)
 
-import           Logic.Propositional       (ConstrainedModelSearch (findConstrainedModel),
-                                            Literal (Pos))
-import           Logic.Semantics           (Semantics ((|=)))
+import Logic.Propositional
+  ( ConstrainedModelSearch(findConstrainedModel)
+  , Literal(Pos)
+  )
+import Logic.Semantics (Semantics((|=)))
 
 findConstrainedModel' ::
      Set.Set (Literal LinearInequality) -> IO (Maybe (Map.Map String Rational))

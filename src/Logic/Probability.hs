@@ -23,8 +23,8 @@ import Data.Ratio (denominator)
 
 import Logic.Probability.Categorical (Categorical(unCategorical))
 import Logic.Propositional (Propositional(Not))
-import Logic.Propositional.DPLL (CNF, ConstrainedModelSearch)
-import Logic.Propositional.Tseitin (tseitinTransform)
+import Logic.Propositional.Internal.DPLL (CNF, ConstrainedModelSearch)
+import Logic.Propositional.Internal.Tseitin (tseitinTransform)
 import Logic.Semantics (ModelSearch(findModel), Semantics((|=)))
 
 -- | Probability Inequalities

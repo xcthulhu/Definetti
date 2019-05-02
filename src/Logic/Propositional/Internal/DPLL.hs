@@ -4,7 +4,7 @@
 {-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Logic.Propositional.DPLL
+module Logic.Propositional.Internal.DPLL
   ( Literal(Pos, Neg)
   , ConstraintProblem
   , HornClause
@@ -62,6 +62,7 @@ class Semantics d p where
 class ModelSearch d p f where
   findModel :: p -> f d
 
+-- | ConstraintProblems are model searches over conjunctions of propositions
 class ConstrainedModelSearch d l f where
   findConstrainedModel :: ConstraintProblem l -> f d
 
@@ -138,7 +139,7 @@ instance ( Ord l
         -- Fail early if falsum is a subgoal
         guard $ not (mempty `Data.Set.member` clauses)
         case Data.Foldable.concatMap Data.Set.toList clauses of
-          -- If DPLL has terminated, call findModel
+          -- If DPLL has terminated, attempt to solve the new constraint problem
           []  -> findConstrainedModel assms
           -- Otherwise try various tactics for resolving goals
           x:_ -> dpll =<< msum

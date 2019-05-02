@@ -4,9 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
-module Logic.LinearProgramming where
-
-import           Prelude                hiding (sequence)
+module Logic.Z3.Internal.LinearProgramming where
 
 import           Control.Exception      (Exception, throwIO)
 import           Control.Monad          (MonadPlus, forM, join, mzero, when,
@@ -48,8 +46,6 @@ extractLPVarNames = nub . (extractLinearInequalityVars =<<)
     extractLinearInequalityVars (x :<=: y) = foldMap extractSumVars [x, y]
 
 type LPVarMap = Map.Map String Z3.AST
-
-type LPSolution = Map.Map String Rational
 
 data IllegalVariableException = IllegalVariableException
   { illegalVariableName   :: String
