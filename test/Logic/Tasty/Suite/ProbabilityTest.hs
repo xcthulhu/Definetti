@@ -16,7 +16,7 @@ import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
 
 import           Logic.Probability     (Categorical,
-                                        Probability ((:*), (:+), Const, Pr),
+                                        Probability ((:*), (:+), Const, Pr, (:-)),
                                         ProbabilityInequality ((:<), (:<=), (:>), (:>=)))
 import           Logic.Propositional   (Propositional ((:&&:), (:->:), (:||:), Not))
 import           Logic.Semantics       (ModelSearch (findModel),
@@ -36,6 +36,7 @@ instance Arbitrary p => Arbitrary (Probability p) where
             , Const <$> arbitrary
             , liftM2 (:*) arbitrary (sizedProbability (n - 1))
             , liftM2 (:+) halfSizeSubFormula halfSizeSubFormula
+            , liftM2 (:-) halfSizeSubFormula halfSizeSubFormula
             ]
         where
           halfSizeSubFormula = sizedProbability (n `div` 2)

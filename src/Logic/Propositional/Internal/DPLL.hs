@@ -123,7 +123,7 @@ oneRule sequent@(_ :|-: clauses) =
         then empty
         else (pure . unitPropogate singletons) sequent
 
-{- Core Search Algorithm -}
+{- ------------------------- Core Search Algorithm ------------------------- -}
 
 -- | Answer-Sat using DPLL
 --   By using an underlying model search procedure for conjuncts of clauses
