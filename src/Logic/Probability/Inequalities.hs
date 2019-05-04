@@ -116,17 +116,17 @@ instance Semantics d p =>
 --
 --   ∃ P ∈ Probabilities . (∑cᵢ·P(ϕᵢ)) + A ≤ (∑kⱼ·P(ψⱼ)) + B
 --                           ≡
---   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K
+--   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K + 1
 --
 -- where
 --   - M is the least common multiple of all of the cᵢ and kⱼ.
---   - K = ⌊(∑cᵢ + A - B )·M⌋ + 1
+--   - K = ⌊(∑cᵢ + A - B )·M⌋
 --
 -- There is a similar law for strict inequality:
 --
---   ∃ P ∈ Probabilities . (∑cᵢ·P(ϕᵢ)) + A < (∑kⱼ·P(ψⱼ)) + B
+--   ∃ P ∈ Probabilities . ∑(cᵢ·P(ϕᵢ)) + A < ∑(kⱼ·P(ψⱼ)) + B
 --                           ≡
---   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K + 1
+--   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K
 --
 -- It is not necessary to solve intWeightedMaxSat.
 -- It is sufficient to find some model with weight exceeding K.
