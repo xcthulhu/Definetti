@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -8,11 +6,8 @@ module Logic.Probability.Inequalities
   ( ProbabilityInequality((:<), (:>), (:>=), (:<=))
   ) where
 
-
-import Control.Applicative (Alternative, (<|>), empty)
 import Control.Arrow ((***), first, second)
-import Control.Monad (MonadPlus, msum)
-import Data.Foldable (fold)
+import Control.Monad (MonadPlus)
 import Data.List (partition)
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -25,8 +20,9 @@ import Logic.Probability.Categorical
   , pr
   )
 import Logic.Propositional (Propositional(Not))
-import Logic.Propositional.Internal.DPLL (CNF, ConstrainedModelSearch)
+import Logic.Propositional.Internal.DPLL (ConstrainedModelSearch)
 import Logic.Propositional.Internal.Tseitin (tseitinTransform)
+import Logic.Propositional.Internal.WeightedSat (intWeightedSatGT)
 import Logic.Semantics (ModelSearch(findModel), Semantics((|=)))
 
 -- | Probability Inequalities
@@ -113,58 +109,34 @@ instance Semantics d p =>
          Semantics (Categorical d) (GTSummationNormalForm p) where
   m |= gnf = m |= unNormalizeProbInequality gnf
 
--- | Choose elements of a weighted collection with collective weight
---   greater than or equal to `k` such that if any element was removed
---   the collection would weigh less than `k`.
---
---   If all elements have weight 1, then
---   `|totalWeight choose k| = totalWeight! / (k!(totalWeight-k)!)`
---
---   Lifted into an arbitrary `Alternative` functor;
---   using `List` results in a list of all of the possibilities.
-weightedChoose :: Alternative f => Integer -> [(Integer, a)] -> f [a]
-weightedChoose k xs = weightedChoose' k xs (sum . fmap fst $ xs)
-  where
-    weightedChoose' ::
-         Alternative f => Integer -> [(Integer, a)] -> Integer -> f [a]
-    weightedChoose' c clauses totalWeight
-      | c > totalWeight = empty
-      | c <= 0 = pure []
-      | [] <- clauses = error "Pattern should be unreachable!"
-      | ((weight, x):clauses') <- clauses =
-        let totalWeight' = totalWeight - weight
-         in weightedChoose' c clauses' totalWeight' <|>
-            fmap (x :) (weightedChoose' (c - weight) clauses' totalWeight')
-
--- | Find a model of some model of a group of weighted clauses
---   in conjunctive normal form with weight greater than `k`
-weightedSatGT ::
-     (Ord a, MonadPlus m, ModelSearch d (CNF a) m)
-  => Integer
-  -> [(Integer, CNF a)]
-  -> m d
-weightedSatGT k clauses = msum . fmap (findModel . fold) $ chooseN clauses
-  where
-    chooseN :: [(Integer, CNF a)] -> [[CNF a]]
-    chooseN = weightedChoose (k + 1)
-
 -- | Model search for probabilistic inequalities in
 --   'GTSummationNormalForm'
 --
---   This makes use of the law
+--   This makes use of the law:
 --
 --   ∃ P ∈ Probabilities . (∑cᵢ·P(ϕᵢ)) + A ≤ (∑kⱼ·P(ψⱼ)) + B
 --                           ≡
---   IntegerWeightedMaxSat([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)]) > K
+--   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K
 --
 -- where
 --   - M is the least common multiple of all of the cᵢ and kⱼ.
 --   - K = ⌊(∑cᵢ + A - B )·M⌋ + 1
 --
--- It is not necessary to solve IntegerWeightedMaxSat.
+-- There is a similar law for strict inequality:
+--
+--   ∃ P ∈ Probabilities . (∑cᵢ·P(ϕᵢ)) + A < (∑kⱼ·P(ψⱼ)) + B
+--                           ≡
+--   |intWeightedMaxSat ([(cᵢ·M, ¬ϕᵢ)] <> [(kⱼ·M, ψⱼ)])| > K + 1
+--
+-- It is not necessary to solve intWeightedMaxSat.
 -- It is sufficient to find some model with weight exceeding K.
--- For that implies all IntegerWeightedMaxSat solutions
--- are greater than K.
+-- For that implies all intWeightedMaxSat solutions have weight
+-- greater than K.
+--
+-- This yields the law:
+--
+--   k < |intMaxSAT weightedClauses| ≡ intWeightedSatGT k weightedClauses
+--
 --
 -- findModel returns a model of clauses with weight greater than K
 -- if possible.
@@ -174,7 +146,7 @@ instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
                                   , rightHandTerms
                                   , leftHandConstant
                                   , strict
-                                  } = pure <$> weightedSatGT k clauses
+                                  } = pure <$> intWeightedSatGT k clauses
     where
       allTerms = leftHandTerms <> rightHandTerms
       listLCM = foldr lcm 1

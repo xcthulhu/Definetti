@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Logic.Propositional.Internal.Free
+module Logic.Propositional.Free
   ( FreeVars(Bound, Free)
   , FreeModel(FreeModel)
   ) where

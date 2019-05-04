@@ -22,9 +22,10 @@ library
                       , z3
   default-language:     Haskell2010
   exposed-modules:      Logic.Propositional
-                      , Logic.Propositional.Internal.Tseitin
+                      , Logic.Propositional.Free
                       , Logic.Propositional.Internal.DPLL
-                      , Logic.Propositional.Internal.Free
+                      , Logic.Propositional.Internal.Tseitin
+                      , Logic.Propositional.Internal.WeightedSat
                       , Logic.Probability
                       , Logic.Probability.Regression
                       , Logic.Probability.Inequalities
