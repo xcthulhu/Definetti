@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MonoLocalBinds        #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Logic.Propositional.Internal.DPLL
   ( Literal(Pos, Neg)
@@ -12,22 +13,32 @@ module Logic.Propositional.Internal.DPLL
   , ModelSearch(findModel)
   , ConstrainedModelSearch(findConstrainedModel)
   , Semantics((|=))
+  ) where
+
+import Control.Applicative (Alternative, empty, pure)
+import Control.Monad (MonadPlus, guard, msum)
+import qualified Data.Foldable (concatMap, fold)
+import Data.Monoid ((<>), mempty)
+import Data.Set ((\\))
+import qualified Data.Set
+  ( Set
+  , filter
+  , intersection
+  , map
+  , member
+  , null
+  , partition
+  , singleton
+  , size
+  , toList
   )
-where
-
-import           Control.Applicative (Alternative, empty, pure)
-import           Control.Monad       (MonadPlus, guard, msum)
-import qualified Data.Foldable       (concatMap, fold)
-import           Data.Monoid         (mempty, (<>))
-import           Data.Set            ((\\))
-import qualified Data.Set            (Set, filter, intersection, map, member,
-                                      null, partition, singleton, size, toList)
-
 
 {- --------------------------------- Types -------------------------------- -}
-
 -- | Definitional Literals for Definitional Conjunctive Normal Form
-data Literal a = Pos a | Neg a deriving (Ord, Show, Eq, Functor)
+data Literal a
+  = Pos a
+  | Neg a
+  deriving (Ord, Show, Eq, Functor)
 
 -- | Clauses are sets of literals
 type Clause a = Data.Set.Set (Literal a)
@@ -41,13 +52,21 @@ type HornClause a = Clause a
 -- | Conjunctive Normal Form
 type CNF a = Data.Set.Set (HornClause a)
 
-
 {- ------------------------------ Type Classes ----------------------------- -}
-
 -- | Truth-functional semantics
 class Semantics d p where
   infixr 6 |=
   (|=) :: d -> p -> Bool
+
+-- (|/=) :: Semantics d p => d -> p -> Bool
+--   (|/=) = not . (|=)
+instance Semantics d p => Semantics d (CNF p) where
+  (|=) d =
+    all $
+    any
+      (\case
+         Pos p -> d |= p
+         Neg p -> not $ d |= p)
 
 -- | ModelSearch
 --
@@ -56,19 +75,21 @@ class Semantics d p where
 -- the following law:
 --
 -- @
--- fmap (|= p) (findModel p) == fmap (const True) (findModel p)
+-- (|= p) <$> (findModel p) == (const True) <$> (findModel p)
 -- @
 --
-class ModelSearch d p f where
+class Semantics d p =>
+      ModelSearch d p f
+  where
   findModel :: p -> f d
 
 -- | ConstraintProblems are model searches over conjunctions of propositions
-class ConstrainedModelSearch d l f where
-  findConstrainedModel :: ConstraintProblem l -> f d
-
+class Semantics d p =>
+      ConstrainedModelSearch d p f
+  where
+  findConstrainedModel :: ConstraintProblem p -> f d
 
 {- ------ Davis–Putnam–Logemann–Loveland Procedure for Model Search ------ -}
-
 -- | Flip the sign of a literal
 neg :: Literal p -> Literal p
 neg (Pos p) = Neg p
@@ -77,10 +98,10 @@ neg (Neg p) = Pos p
 -- | State for DPLL is modeled like logical deduction
 --   LHS: a set of assumptions / partial model (conjunction of literals)
 --   RHS: A set of goals in conjunctive normal form
-data Sequent p = ConstraintProblem p :|-: CNF p
+data Sequent p =
+  ConstraintProblem p :|-: CNF p
 
 {- Goal Reduction Rules -}
-
 -- | Unit Propogation
 --   Takes literals `L` and sequent `A :|-: B` to `L ∪ A :|-: B'`
 --   where `B'` is defined by
@@ -91,7 +112,7 @@ unitPropogate literals (assms :|-: clauses) =
   let resolve = Data.Set.map (\\ Data.Set.map neg literals)
       filterSatisfied =
         Data.Set.filter (Data.Set.null . (literals `Data.Set.intersection`))
-  in  (literals <> assms) :|-: filterSatisfied (resolve clauses)
+   in (literals <> assms) :|-: filterSatisfied (resolve clauses)
 
 -- | Pure Rule
 --   A literal is said to be _pure_ in a CNF if all instances have the same sign
@@ -99,18 +120,17 @@ unitPropogate literals (assms :|-: clauses) =
 --   This rule finds all pure literals and performs unit propogation on them
 pureRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
 pureRule sequent@(_ :|-: clauses) =
-  let
-    sign (Pos _) = True
-    sign (Neg _) = False
+  let sign (Pos _) = True
+      sign (Neg _) = False
     -- Partition the positive and negative formulae
-    (positive, negative) = Data.Set.partition sign (Data.Foldable.fold clauses)
+      (positive, negative) =
+        Data.Set.partition sign (Data.Foldable.fold clauses)
     -- Compute the literals that are purely positive/negative
-    purePos              = positive \\ Data.Set.map neg negative
-    pureNeg              = negative \\ Data.Set.map neg positive
-  in
-    if Data.Set.null purePos && Data.Set.null pureNeg
-      then empty
-      else (pure . unitPropogate (purePos <> pureNeg)) sequent
+      purePos = positive \\ Data.Set.map neg negative
+      pureNeg = negative \\ Data.Set.map neg positive
+   in if Data.Set.null purePos && Data.Set.null pureNeg
+        then empty
+        else (pure . unitPropogate (purePos <> pureNeg)) sequent
 
 -- | One Rule
 --   If a clause `{x}` occurs in a CNF, add the clause to the assumptions
@@ -119,32 +139,32 @@ oneRule :: (Ord p, Alternative f) => Sequent p -> f (Sequent p)
 oneRule sequent@(_ :|-: clauses) =
   let isSingleton c = Data.Set.size c == 1
       singletons = (Data.Foldable.fold . Data.Set.filter isSingleton) clauses
-  in  if null singletons
+   in if null singletons
         then empty
         else (pure . unitPropogate singletons) sequent
 
 {- ------------------------- Core Search Algorithm ------------------------- -}
-
 -- | Answer-Sat using DPLL
 --   By using an underlying model search procedure for conjuncts of clauses
 --   DPLL can be used to lift that procedure to CNFs of clauses
-instance ( Ord l
-         , MonadPlus m
-         , ConstrainedModelSearch d l m )
-         => ModelSearch d (CNF l) m
-  where
+instance (Ord l, MonadPlus m, ConstrainedModelSearch d l m) =>
+         ModelSearch d (CNF l) m where
   findModel goalClauses = dpll $ mempty :|-: goalClauses
     where
-      dpll sequent@(assms :|-: clauses) = do
+      dpll sequent@(assms :|-: clauses)
         -- Fail early if falsum is a subgoal
+       = do
         guard $ not (mempty `Data.Set.member` clauses)
-        case Data.Foldable.concatMap Data.Set.toList clauses of
+        case Data.Foldable.concatMap Data.Set.toList clauses
           -- If DPLL has terminated, attempt to solve the new constraint problem
-          []  -> findConstrainedModel assms
+              of
+          [] -> findConstrainedModel assms
           -- Otherwise try various tactics for resolving goals
-          x:_ -> dpll =<< msum
-            [ pureRule sequent
-            , oneRule sequent
-            , return (unitPropogate (Data.Set.singleton x) sequent)
-            , return (unitPropogate ((Data.Set.singleton . neg) x) sequent)
-            ]
+          x:_ ->
+            dpll =<<
+            msum
+              [ pureRule sequent
+              , oneRule sequent
+              , return (unitPropogate (Data.Set.singleton x) sequent)
+              , return (unitPropogate ((Data.Set.singleton . neg) x) sequent)
+              ]

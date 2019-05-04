@@ -22,7 +22,11 @@ import Data.Monoid ((<>))
 import Data.Ratio (denominator)
 import Data.Tuple (swap)
 
-import Logic.Probability.Categorical (Categorical(unCategorical), Probability(Pr, Const, (:+), (:*), (:-)), pr)
+import Logic.Probability.Categorical
+  ( Categorical(unCategorical)
+  , Probability((:*), (:+), (:-), Const, Pr)
+  , pr
+  )
 import Logic.Propositional (Propositional(Not))
 import Logic.Propositional.Internal.DPLL (CNF, ConstrainedModelSearch)
 import Logic.Propositional.Internal.Tseitin (tseitinTransform)
@@ -47,10 +51,10 @@ instance Semantics d p =>
 -- Represents equations of the form:
 -- `w1 * a1 + w2 * a2 + ... + C </<= v1 * b1 + v2 * b2 + ...`
 -- here `</<=` is either strict or non-strict inequality
-data GTSummationNormalForm a = GTSummationNormalForm
-  { leftHandTerms :: [(Rational, a)]
+data GTSummationNormalForm p = GTSummationNormalForm
+  { leftHandTerms :: [(Rational, Propositional p)]
   , leftHandConstant :: Rational
-  , rightHandTerms :: [(Rational, a)]
+  , rightHandTerms :: [(Rational, Propositional p)]
   , strict :: Bool
   }
 
@@ -64,8 +68,10 @@ extractPropositions ::
      Ord p => Probability p -> Map.Map (Propositional p) Rational
 extractPropositions (Pr p) = Map.singleton p 1
 extractPropositions (Const _) = Map.empty
-extractPropositions (x :+ y) = extractPropositions x `plus` extractPropositions y
-extractPropositions (x :- y) = extractPropositions x `minus` extractPropositions y
+extractPropositions (x :+ y) =
+  extractPropositions x `plus` extractPropositions y
+extractPropositions (x :- y) =
+  extractPropositions x `minus` extractPropositions y
 extractPropositions (a :* x) = Map.map (a *) (extractPropositions x)
 
 extractConstantTerm :: Probability p -> Rational
@@ -75,12 +81,13 @@ extractConstantTerm (x :+ y) = extractConstantTerm x + extractConstantTerm y
 extractConstantTerm (x :- y) = extractConstantTerm x - extractConstantTerm y
 extractConstantTerm (a :* x) = a * extractConstantTerm x
 
-summationNormalForm ::
-     Ord p => ProbabilityInequality p -> GTSummationNormalForm (Propositional p)
-summationNormalForm (b :> a) = summationNormalForm (a :< b)
-summationNormalForm (b :>= a) = summationNormalForm (a :<= b)
-summationNormalForm (a :< b) = (summationNormalForm (a :<= b)) {strict = True}
-summationNormalForm (a :<= b) =
+normalizeProbInequality ::
+     Ord p => ProbabilityInequality p -> GTSummationNormalForm p
+normalizeProbInequality (b :> a) = normalizeProbInequality (a :< b)
+normalizeProbInequality (b :>= a) = normalizeProbInequality (a :<= b)
+normalizeProbInequality (a :< b) =
+  (normalizeProbInequality (a :<= b)) {strict = True}
+normalizeProbInequality (a :<= b) =
   GTSummationNormalForm
     { leftHandTerms = lhts
     , leftHandConstant = extractConstantTerm a - extractConstantTerm b
@@ -89,11 +96,25 @@ summationNormalForm (a :<= b) =
     }
   where
     weightedTerms =
-      fmap swap . Map.toList $ extractPropositions a `minus` extractPropositions b
+      fmap swap . Map.toList $
+      extractPropositions a `minus` extractPropositions b
     (lhts, rhts) =
       second (fmap (first negate)) .
       partition ((> 0) . fst) . filter ((/= 0) . fst) $
       weightedTerms
+
+unNormalizeProbInequality :: GTSummationNormalForm p -> ProbabilityInequality p
+unNormalizeProbInequality gnf
+  | GTSummationNormalForm lht lhConst rht True <- gnf =
+    toProb lhConst lht :< toProb 0 rht
+  | GTSummationNormalForm lht lhConst rht False <- gnf =
+    toProb lhConst lht :<= toProb 0 rht
+  where
+    toProb c terms = foldr (:+) (Const c) $ (\(k, p) -> k :* Pr p) <$> terms
+
+instance Semantics d p =>
+         Semantics (Categorical d) (GTSummationNormalForm p) where
+  m |= gnf = m |= unNormalizeProbInequality gnf
 
 -- | Choose elements of a weighted collection with collective weight
 --   greater than or equal to `k` such that if any element was removed
@@ -151,7 +172,7 @@ weightedSatGT k clauses = msum . fmap (findModel . fold) $ chooseN clauses
 -- findModel returns a model of clauses with weight greater than K
 -- if possible.
 instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
-         ModelSearch (Categorical d) (GTSummationNormalForm (Propositional p)) m where
+         ModelSearch (Categorical d) (GTSummationNormalForm p) m where
   findModel GTSummationNormalForm { leftHandTerms
                                   , rightHandTerms
                                   , leftHandConstant
@@ -175,4 +196,4 @@ instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
 
 instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
          ModelSearch (Categorical d) (ProbabilityInequality p) m where
-  findModel = findModel . summationNormalForm
+  findModel = findModel . normalizeProbInequality

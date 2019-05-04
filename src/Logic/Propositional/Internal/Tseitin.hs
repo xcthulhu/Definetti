@@ -57,10 +57,15 @@ instance Semantics d p => Semantics d (Propositional p) where
 --
 --   This is a _referentially transparent_ means of creating labels,
 --   however it differs from Harrison's method (which uses a counter as state).
+--   This method also leads to better performance in pratice.
 data Definitional p
   = Definition (Propositional p) -- ^ a literal that defines a subterm
   | Atom p -- ^ a literal for an atomic proposition
   deriving (Ord, Show, Eq)
+
+instance Semantics d p => Semantics d (Definitional p) where
+  m |= (Definition prop) = m |= prop
+  m |= (Atom a) = m |= a
 
 -- | ConstrainedModelSearch for Conjunctions of Literals of Definitional Atoms
 -- When finding a model for a conjunction of literals of definitional atoms,

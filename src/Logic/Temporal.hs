@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Logic.Temporal
   ( Temporal(Until, Always)
@@ -30,9 +30,19 @@ import Logic.Propositional.Internal.DPLL
 import Logic.Propositional.Internal.Tseitin (Definitional, tseitinTransform)
 import Logic.Semantics (Semantics, (|=))
 
--- | Temporal logic primitives
+-- | Simplified linear temporal logic primitives
+--
+--   Terms of 'Propositional (Temporal p)' are a sublanguage of traditional
+--   linear temporal logic.
+--
+--   However, this sublanguage corresponds to linear temporal logic without
+--   nested modalities.
+--
+--   One benefit of this simplified language is that it is composable with other
+--   inference systems in our Answer-SAT framework.
 data Temporal p
-  = p `Until` p
+  = Until p
+          p
   | Always p
   deriving (Ord, Show, Eq, Functor)
 
@@ -49,8 +59,10 @@ before ::
   -> Propositional (Temporal (Propositional p))
 a `before` b = (Not b `until` a) :&&: (Verum `until` b)
 
+-- Used in decision algorithm
 data Until_ a =
-  a `Until_` a
+  Until_ a
+         a
   deriving (Functor)
 
 instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
@@ -60,10 +72,6 @@ instance Semantics d p => Semantics (NonEmpty d) (Temporal p) where
       (m':ms') |== u@(p `Until` q) = m' |= q || (m' |= p && ms' |== u)
       [] |== (_ `Until` _) = False
 
--- singlePick :: [a] -> [(a,[a])]
--- singlePick []     = mempty
--- singlePick [x]    = pure (x,[])
--- singlePick (x:xs) = (x,xs) : (second (x:) <$> singlePick xs)
 instance Semigroup a => Semigroup (Until_ a) where
   (a `Until_` b) <> (c `Until_` d) = (a <> c) `Until_` (b <> d)
 
@@ -86,13 +94,17 @@ data TimelineProblem p = TimelineProblem
   , untils :: [Until_ (CNF (Definitional p))]
   }
 
+instance Semantics d p => Semantics (NonEmpty d) (TimelineProblem p) where
+  ms |= TimelineProblem {always, untils} =
+    ms |= Always always && and ((\(Until_ p q) -> ms |= Until p q) <$> untils)
+
 instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
          ModelSearch (NonEmpty d) (TimelineProblem p) m where
-  findModel TimelineProblem {..} =
+  findModel TimelineProblem {always, untils} =
     reverse <$> ((:|) <$> initialState <*> search always untils)
     where
       initialState = findModel always
-      search _ [] = pure mempty
+      search _ [] = pure []
       search always' untils' = msum $ tryTimeline always' <$> multiPick untils'
       tryTimeline always' (selection, rest) = do
         let (p `Until_` q) = Data.Foldable.fold selection
@@ -120,14 +132,15 @@ instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
     where
       preTimeline =
         foldr preproc (PreTimeline mempty [] []) . Data.Set.toList $ clauses
-      addTemp pt@PreTimeline {..} (Always a) = pt {preAlways = preAlways <> a}
-      addTemp pt@PreTimeline {..} (p `Until` q) =
+      addTemp pt@PreTimeline {preAlways} (Always a) =
+        pt {preAlways = preAlways <> a}
+      addTemp pt@PreTimeline {preUntils} (p `Until` q) =
         pt {preUntils = (p `Until_` q) : preUntils}
       addTempT pt = addTemp pt . fmap tseitinTransform
       preproc (Pos p@(Always _)) pt = addTempT pt p
       preproc (Pos u@(_ `Until` _)) pt = addTempT pt u
       preproc (Neg (Always p)) pt = addTempT pt (Verum `Until` Not p)
-      preproc (Neg (p `Until` q)) pt@PreTimeline {..} =
+      preproc (Neg (p `Until` q)) pt@PreTimeline {choices} =
         pt
           { choices =
               (fmap . fmap)
@@ -135,7 +148,7 @@ instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
                 (Choice (p `Until` (Not p :&&: Not q)) (Always (Not q))) :
               choices
           }
-      searchTimelines pt@PreTimeline {..} =
+      searchTimelines pt@PreTimeline {preAlways, preUntils, choices} =
         case choices of
           [] -> findModel (TimelineProblem preAlways preUntils)
           (c:cs) -> choose (searchTimelines . addTemp (pt {choices = cs}) <$> c)
