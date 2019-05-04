@@ -27,6 +27,7 @@ library
                       , Logic.Propositional.Internal.Free
                       , Logic.Probability
                       , Logic.Probability.Regression
+                      , Logic.Probability.Inequalities
                       , Logic.Probability.Categorical
                       , Logic.Semantics
                       , Logic.Temporal
