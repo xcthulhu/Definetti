@@ -1,13 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 
-module Logic.Propositional.Internal.WeightedSat
-  ( intWeightedSatGTE
-  , intWeightedSatGT
-  ) where
+module Logic.Propositional.Internal.WeightedSat where
 
-import Control.Applicative (Alternative, (<|>), empty)
-import Data.Foldable (fold, asum)
+import Control.Arrow (first)
+import Data.Ratio (Rational, denominator)
+import Control.Applicative (Alternative((<|>), empty))
+import Data.Foldable (asum, fold)
 
 import Logic.Propositional.Internal.DPLL (CNF)
 import Logic.Semantics (ModelSearch(findModel))
@@ -32,8 +31,8 @@ weightedChoose k xs = weightedChoose' k xs (sum . fmap fst $ xs)
       | [] <- clauses = error "Pattern should be unreachable!"
       | ((weight, x):clauses') <- clauses =
         let totalWeight' = totalWeight - weight
-         in weightedChoose' c clauses' totalWeight' <|>
-            fmap (x :) (weightedChoose' (c - weight) clauses' totalWeight')
+         in fmap (x :) (weightedChoose' (c - weight) clauses' totalWeight')
+            <|> weightedChoose' c clauses' totalWeight'
 
 -- | Find a model of weighted clauses in conjunctive normal form
 --   with weight greater or equal to than `k`
@@ -47,13 +46,13 @@ weightedChoose k xs = weightedChoose' k xs (sum . fmap fst $ xs)
 --   The left hand side is in MAXSAT.
 --   The right hand side is in NP.
 --   It is believed NP ⊊ MAXSAT.
-
 intWeightedSatGTE ::
      (Ord a, Alternative m, ModelSearch d (CNF a) m)
   => Integer
   -> [(Integer, CNF a)]
   -> m d
-intWeightedSatGTE k weightedClauses = asum . fmap (findModel . fold) $ chooseN weightedClauses
+intWeightedSatGTE k weightedClauses =
+  asum . fmap (findModel . fold) $ chooseN weightedClauses
   where
     chooseN :: [(Integer, CNF a)] -> [[CNF a]]
     chooseN = weightedChoose k
@@ -70,4 +69,26 @@ intWeightedSatGT ::
   => Integer
   -> [(Integer, CNF a)]
   -> m d
-intWeightedSatGT k = intWeightedSatGTE (k+1)
+intWeightedSatGT k = intWeightedSatGTE (k + 1)
+
+multiplyThroughByLCM :: (Rational, [(Rational, a)]) -> (Integer, [(Integer, a)])
+multiplyThroughByLCM (r, weightedAs) =
+  (floor (m * r), first (floor . (m *)) <$> weightedAs)
+  where
+    m = fromIntegral $ foldr lcm (denominator r) (denominator . fst <$> weightedAs)
+
+weightedSatGTE ::
+     (Ord a, Alternative m, ModelSearch d (CNF a) m)
+  => Rational
+  -> [(Rational, CNF a)]
+  -> m d
+weightedSatGTE k weightedClauses =
+  uncurry intWeightedSatGTE . multiplyThroughByLCM $ (k, weightedClauses)
+
+weightedSatGT ::
+     (Ord a, Alternative m, ModelSearch d (CNF a) m)
+  => Rational
+  -> [(Rational, CNF a)]
+  -> m d
+weightedSatGT k weightedClauses =
+  uncurry intWeightedSatGTE . multiplyThroughByLCM $ (k, weightedClauses)
