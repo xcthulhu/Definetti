@@ -1,7 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -38,8 +36,7 @@ import qualified Data.Set
 data Literal a
   = Pos a
   | Neg a
-  deriving (Ord, Show, Eq, Functor)
-
+  deriving (Ord, Show, Eq)
 -- | Clauses are sets of literals
 type Clause a = Data.Set.Set (Literal a)
 

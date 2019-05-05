@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -18,7 +17,7 @@ import Data.Tuple (swap)
 
 import Control.Applicative (Alternative((<|>), empty))
 import Data.Foldable (asum, fold)
-import GHC.Exts (sortWith)
+-- import GHC.Exts (sortWith)
 import Logic.Probability.Categorical
   ( Categorical
   , Probability((:*), (:+), (:-), Const, Pr)
@@ -119,9 +118,8 @@ unNormalizeProbInequality gnf
 --   Lifted into an arbitrary `Alternative` functor;
 --   using `List` results in a list of all of the possibilities.
 weightedChoose :: Alternative f => Integer -> [(Integer, a)] -> f [a]
-weightedChoose k xs = weightedChoose' k sortedXs (sum . fmap fst $ sortedXs)
+weightedChoose k xs = weightedChoose' k xs (sum . fmap fst $ xs)
   where
-    sortedXs = sortWith fst xs
     weightedChoose' ::
          Alternative f => Integer -> [(Integer, a)] -> Integer -> f [a]
     weightedChoose' c clauses totalWeight
@@ -146,7 +144,7 @@ weightedChoose k xs = weightedChoose' k sortedXs (sum . fmap fst $ sortedXs)
 --   The right hand side is in NP.
 --   It is believed NP ⊊ MAXSAT.
 intWeightedSatGTE ::
-     (Ord a, Alternative m, ModelSearch d (CNF a) m)
+     (Ord a, MonadPlus m, ConstrainedModelSearch d a m)
   => Integer
   -> [(Integer, CNF a)]
   -> m d
@@ -163,7 +161,7 @@ intWeightedSatGTE k weightedClauses =
 --
 --   k < |intMaxSAT weightedClauses| ≡ intWeightedSatGT k weightedClauses
 intWeightedSatGT ::
-     (Ord a, Alternative m, ModelSearch d (CNF a) m)
+     (Ord a, MonadPlus m, ConstrainedModelSearch d a m)
   => Integer
   -> [(Integer, CNF a)]
   -> m d
