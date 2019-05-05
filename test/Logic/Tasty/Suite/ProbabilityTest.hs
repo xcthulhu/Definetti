@@ -10,7 +10,7 @@ module Logic.Tasty.Suite.ProbabilityTest
 import           Control.Monad         (liftM2)
 import           Data.Monoid           ((<>))
 import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, oneof,
-                                        sized)
+                                        sized, within)
 import           Test.Tasty            (TestTree, testGroup)
 import           Test.Tasty.HUnit      (testCase, (@?), (@?=))
 import           Test.Tasty.QuickCheck (testProperty)
@@ -121,9 +121,11 @@ probabilityInequalitySemanticsQC :: TestTree
 probabilityInequalitySemanticsQC =
   testGroup
     "Probability Semantics Laws"
-    [ testProperty
+    [
+      testProperty
         ("Forall f: `fmap (|= f) (findModel f)" <>
-         " == fmap (const True) (findModel f)`") $ \f ->
+         " == fmap (const True) (findModel f)`") $ within 10000000 $
+        \f ->
         let m = findModel' f
          in fmap (|= f) m == fmap (const True) m
     ]
