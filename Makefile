@@ -1,22 +1,31 @@
 .PHONY: build test configure configure-emacs clean app
 
 build:
-	stack build
+	cabal build
 
-TAGS: $(shell find src -name "*.hs") $(shell find app -name "*.hs")
-	haskdogs --use-stack ON --hasktags-args "--etags"
+configure:
+	nix-shell --run 'cabal configure --enable-tests'
+
+configure-with-coverage:
+	nix-shell --run 'cabal configure --enable-tests --enable-coverage'
+
+configure-emacs:
+	nix-shell --run 'cabal configure -flibrary-only'
 
 test:
-	stack test
+	nix-shell --run 'cabal test --test-show-details=streaming'
 
 hlint:
-	stack test hlint --show-details=streaming
+	nix-shell --run 'cabal test hlint --test-show-details=streaming'
+
+# ghcid:
+# 	nix-shell --run 'stack build && ghcid'
 
 app: dist/build/shepherd/shepherd
 
 dist/build/shepherd/shepherd: $(shell find src -name "*.hs") $(shell find app -name "*.hs")
-	stack build shepherd
+	nix-shell --run 'cabal build shepherd'
 
 clean:
-	rm -rf .stack-work/ dist-newstyle/
+	rm -rf .stack-work/ dist-newstyle/ dist
 	cabal clean
