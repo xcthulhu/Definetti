@@ -1,7 +1,6 @@
 { compiler ? "ghc844" }:
 
 let
-
   src = (import <nixpkgs> {}).fetchFromGitHub {
     owner = "NixOS";
     repo  = "nixpkgs";
@@ -15,7 +14,6 @@ let
   package = haskellPackages.callCabal2nix "definetti" ./. {};
 
 in
-
-  pkgs.haskell.lib.overrideCabal package (oldAttrs: {
-    buildDepends = [ pkgs.z3 ];
-  })
+pkgs.haskell.lib.overrideCabal package (oldAttrs: {
+  buildDepends = [ pkgs.z3 ];
+})
