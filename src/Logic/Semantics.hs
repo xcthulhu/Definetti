@@ -6,4 +6,6 @@ import Logic.Propositional.Internal.DPLL as DPLL
   ( ConstrainedModelSearch(findConstrainedModel)
   , ModelSearch(findModel)
   , Semantics((|=))
+  , ConstraintProblem
+  , Literal(Neg, Pos)
   )

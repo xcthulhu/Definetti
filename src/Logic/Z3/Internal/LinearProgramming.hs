@@ -1,28 +1,30 @@
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 module Logic.Z3.Internal.LinearProgramming where
 
-import           Control.Exception      (Exception, throwIO)
-import           Control.Monad          (MonadPlus, forM, join, mzero, when,
-                                         (<=<))
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Foldable          (foldMap, toList)
-import           Data.List              (isPrefixOf, nub)
-import qualified Data.Map               as Map
-import           Data.Maybe             (fromMaybe)
-import           Data.Ratio             (Rational)
-import           Data.Traversable       (sequence)
-import           Data.Typeable          (Typeable)
-import           Text.Printf            (printf)
-import qualified Z3.Monad               as Z3
+import Control.Exception (Exception, throwIO)
+import Control.Monad (MonadPlus, (<=<), forM, join, mzero, when)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Foldable (foldMap, toList)
+import Data.List (isPrefixOf, nub)
+import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
+import Data.Ratio (Rational)
+import Data.Traversable (sequence)
+import Data.Typeable (Typeable)
+import Text.Printf (printf)
+import qualified Z3.Monad as Z3
 
-import           Logic.Propositional    (ConstrainedModelSearch (findConstrainedModel),
-                                         ConstraintProblem, Literal (Neg, Pos))
-import           Logic.Semantics        (Semantics ((|=)))
+import Logic.Semantics
+  ( ConstrainedModelSearch(findConstrainedModel)
+  , ConstraintProblem
+  , Literal(Neg, Pos)
+  , Semantics((|=))
+  )
 
 infix 7 :+:
 
@@ -42,13 +44,13 @@ extractLPVarNames :: [LinearInequality] -> [String]
 extractLPVarNames = nub . (extractLinearInequalityVars =<<)
   where
     extractSumVars (weightedVars :+: _) = snd <$> weightedVars
-    extractLinearInequalityVars (x :<: y)  = foldMap extractSumVars [x, y]
+    extractLinearInequalityVars (x :<: y) = foldMap extractSumVars [x, y]
     extractLinearInequalityVars (x :<=: y) = foldMap extractSumVars [x, y]
 
 type LPVarMap = Map.Map String Z3.AST
 
 data IllegalVariableException = IllegalVariableException
-  { illegalVariableName   :: String
+  { illegalVariableName :: String
   , illegalVariablePrefix :: String
   }
 
@@ -77,7 +79,7 @@ z3ExtractLPVarMap lpProg =
 
 data MissingVariableKeyException k v = MissingVariableKeyException
   { missingVariableKey :: k
-  , variableMap        :: Map.Map k v
+  , variableMap :: Map.Map k v
   }
 
 instance Show k => Show (MissingVariableKeyException k v) where
@@ -174,6 +176,6 @@ instance (MonadIO m, MonadPlus m) =>
          ConstrainedModelSearch (Map.Map String Rational) LinearInequality m where
   findConstrainedModel = solveLP . fmap fromLit . toList
     where
-      fromLit (Pos x)              = x
-      fromLit (Neg (lhs :<: rhs))  = rhs :<=: lhs
+      fromLit (Pos x) = x
+      fromLit (Neg (lhs :<: rhs)) = rhs :<=: lhs
       fromLit (Neg (lhs :<=: rhs)) = rhs :<: lhs

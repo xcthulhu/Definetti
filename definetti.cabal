@@ -19,16 +19,16 @@ library
   build-depends:        base             >= 4.7 && < 5
                       , containers       >= 0.5 && < 0.7
                       , transformers     >= 0.5 && < 0.6
-                      , z3
+                      , z3               >= 4.3 && < 4.4
   default-language:     Haskell2010
   exposed-modules:      Logic.Propositional
                       , Logic.Propositional.Free
                       , Logic.Propositional.Internal.DPLL
                       , Logic.Propositional.Internal.Tseitin
                       , Logic.Probability
-                      , Logic.Probability.Regression
-                      , Logic.Probability.Inequalities
                       , Logic.Probability.Categorical
+                      , Logic.Probability.Inequality
+                      , Logic.Probability.Regression
                       , Logic.Semantics
                       , Logic.Temporal
                       , Logic.Z3.LinearProgramming
@@ -51,7 +51,7 @@ executable shepherd
 test-suite definetti-test
   type:                 exitcode-stdio-1.0
   hs-source-dirs:       test
-  main-is:              TastyTests.hs
+  main-is:              Logic/Tasty/Main.hs
   build-depends:        definetti
                       , base             >= 4.7  && < 5
                       , QuickCheck       >= 2.9  && < 2.13
@@ -59,8 +59,8 @@ test-suite definetti-test
                       , tasty            >= 1.1  && < 1.3
                       , tasty-quickcheck >= 0.8  && < 0.11
                       , tasty-hunit      >= 0.9  && < 1.0
-                      , transformers     >= 0.5 && < 0.6
-                      , z3
+                      , transformers     >= 0.5  && < 0.6
+                      , z3               >= 4.3  && < 4.4
   ghc-options:          -Wall -threaded -rtsopts -with-rtsopts=-N
   other-modules:        Logic.Tasty.Suite.LinearProgrammingTest
                       , Logic.Tasty.Suite.PropositionalTest
@@ -72,7 +72,7 @@ test-suite definetti-test
 
 test-suite hlint
   type:                exitcode-stdio-1.0
-  main-is:             HLint.hs
+  main-is:             HLint/Main.hs
   build-depends:       base
                      , hlint >= 1.9
   hs-source-dirs:      test

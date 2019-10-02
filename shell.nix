@@ -6,6 +6,7 @@ let
                                                    else [];
                         in oldTestSystemDepends ++ [ pkgs.haskellPackages.ghcid
                                                      pkgs.haskellPackages.cabal-install
+                                                     pkgs.haskellPackages.haskdogs
                                                    ];
     buildDepends      = let oldBuildDepends = if oldAttrs ? buildDepends
                                               then oldAttrs.buildDepends

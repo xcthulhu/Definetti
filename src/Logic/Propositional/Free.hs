@@ -29,7 +29,7 @@ instance Functor (FreeVars v) where
 data FreeModel v d = FreeModel
   { freeVariablesSetToTrue :: Data.Set.Set v
   , model :: d
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Ord)
 
 instance (Ord v, Semantics d p) =>
          Semantics (FreeModel v d) (FreeVars v p) where

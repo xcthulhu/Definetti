@@ -57,7 +57,7 @@ before ::
      Propositional p
   -> Propositional p
   -> Propositional (Temporal (Propositional p))
-a `before` b = (Not b `until` a) :&&: (Verum `until` b)
+a `before` b = Not b `until` (Not b :&&: a)
 
 -- Used in decision algorithm
 data Until_ a =

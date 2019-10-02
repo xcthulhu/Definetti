@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Logic.Probability.Inequalities
+module Logic.Probability.Inequality
   ( ProbabilityInequality((:<), (:>), (:>=), (:<=))
   ) where
 
@@ -14,19 +14,22 @@ import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Ratio (denominator)
 import Data.Tuple (swap)
+import GHC.Exts (sortWith)
 
 import Control.Applicative (Alternative((<|>), empty))
 import Data.Foldable (asum, fold)
--- import GHC.Exts (sortWith)
+
 import Logic.Probability.Categorical
   ( Categorical
   , Probability((:*), (:+), (:-), Const, Pr)
   , pr
+  , dirac
   )
 import Logic.Propositional (Propositional(Not))
 import Logic.Propositional.Internal.DPLL (CNF, ConstrainedModelSearch)
 import Logic.Propositional.Internal.Tseitin (tseitinTransform)
 import Logic.Semantics (ModelSearch(findModel), Semantics((|=)))
+
 
 -- | Probability Inequalities
 data ProbabilityInequality p
@@ -43,7 +46,7 @@ instance Semantics d p =>
   m |= (a :>= b) = pr m a >= pr m b
   m |= (a :> b) = pr m a > pr m b
 
--- | Normal form for probabilistic inequalities / Trades
+-- | Normal form for probabilistic inequalities
 -- Represents equations of the form:
 -- `w1 * a1 + w2 * a2 + ... + C </<= v1 * b1 + v2 * b2 + ...`
 -- here `</<=` is either strict or non-strict inequality
@@ -118,8 +121,9 @@ unNormalizeProbInequality gnf
 --   Lifted into an arbitrary `Alternative` functor;
 --   using `List` results in a list of all of the possibilities.
 weightedChoose :: Alternative f => Integer -> [(Integer, a)] -> f [a]
-weightedChoose k xs = weightedChoose' k xs (sum . fmap fst $ xs)
+weightedChoose k xs = weightedChoose' k sortedXs (sum . fmap fst $ xs)
   where
+    sortedXs = sortWith fst xs
     weightedChoose' ::
          Alternative f => Integer -> [(Integer, a)] -> Integer -> f [a]
     weightedChoose' c clauses totalWeight
@@ -202,13 +206,13 @@ instance Semantics d p =>
 --
 -- findModel returns a model of clauses with weight greater than K
 -- if possible.
-instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
+instance (Ord p, Ord d, MonadPlus m, ConstrainedModelSearch d p m) =>
          ModelSearch (Categorical d) (GTSummationNormalForm p) m where
   findModel GTSummationNormalForm { leftHandTerms
                                   , rightHandTerms
                                   , leftHandConstant
                                   , strict
-                                  } = pure <$> intWeightedSatGT k clauses
+                                  } = dirac <$> intWeightedSatGT k clauses
     where
       allTerms = leftHandTerms <> rightHandTerms
       listLCM = foldr lcm 1
@@ -225,6 +229,6 @@ instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
           then 0
           else 1
 
-instance (Ord p, MonadPlus m, ConstrainedModelSearch d p m) =>
+instance (Ord p, Ord d, MonadPlus m, ConstrainedModelSearch d p m) =>
          ModelSearch (Categorical d) (ProbabilityInequality p) m where
   findModel = findModel . normalizeProbInequality

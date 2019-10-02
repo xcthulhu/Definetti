@@ -8,6 +8,8 @@ module Logic.Propositional.Internal.Tseitin
               Verum)
   , tseitinTransform
   , Definitional(Definition, Atom)
+  , conj
+  , disj
   ) where
 
 import Control.Monad (MonadPlus)
@@ -34,6 +36,13 @@ data Propositional p
   | Verum
   | Falsum
   deriving (Ord, Show, Eq, Functor)
+
+-- Helper function for constructing propositional expressions
+conj :: Foldable f => f (Propositional p) -> Propositional p
+conj = foldr (:&&:) Verum
+
+disj :: Foldable f => f (Propositional p) -> Propositional p
+disj = foldr (:||:) Falsum
 
 -- | Semantics for the Propositional Calculus
 instance Semantics d p => Semantics d (Propositional p) where
