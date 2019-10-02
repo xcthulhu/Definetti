@@ -1,0 +1,2 @@
+-c="stack ghci definetti:lib definetti:test:definetti-test --ghci-options=-fobject-code"
+--test=":main"
