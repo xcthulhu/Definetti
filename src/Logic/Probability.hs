@@ -1,9 +1,9 @@
 module Logic.Probability
   ( module Categorical
-  , module Inequalities
+  , module Inequality
   ) where
 
 import Logic.Probability.Categorical as Categorical
-import Logic.Probability.Inequalities as Inequalities
+import Logic.Probability.Inequality as Inequality
   ( ProbabilityInequality((:<), (:<=), (:>), (:>=))
   )

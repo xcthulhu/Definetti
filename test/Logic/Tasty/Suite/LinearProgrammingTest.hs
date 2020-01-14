@@ -21,11 +21,7 @@ import Logic.Z3.LinearProgramming
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
 
-import Logic.Propositional
-  ( ConstrainedModelSearch(findConstrainedModel)
-  , Literal(Pos)
-  )
-import Logic.Semantics (Semantics((|=)))
+import Logic.Semantics (Semantics((|=)), ConstrainedModelSearch(findConstrainedModel), Literal(Pos))
 
 findConstrainedModel' ::
      Set.Set (Literal LinearInequality) -> IO (Maybe (Map.Map String Rational))
@@ -59,7 +55,6 @@ linearProgrammingTests =
             aLTc = [(1, "A")] :+: 0 :<: [(1, "C")] :+: (0 :: Rational)
             cLEa = [(1, "C")] :+: 0 :<=: [(1, "A")] :+: (0 :: Rational)
         model <- findConstrainedModel' $ Set.fromList [Pos aLTb, Pos bLTc]
-        print model
         (|= aLTc) <$> model @?= Just True
         (|= cLEa) <$> model @?= Just False
     , testCase "Exists a model s.t. 1 < X && X < 2" $ do
