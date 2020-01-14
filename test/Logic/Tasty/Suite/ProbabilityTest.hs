@@ -246,12 +246,12 @@ regressingTemporalProbabilityTests =
       checkCycle 4 (999%1000) (3 % 100)
     , testCase "Fit 5-cycle @ 99% all (should be 80%)" $
       checkCycle 5 (99%100) (3 % 100)
-    , testCase "Fit 6-cycle @ 90% all" $
-      checkCycle 6 (9%10) (3 % 100)
-    , testCase "Fit 7-cycle @ 90% all" $
-      checkCycle 7 (9%10) (3 % 100)
-    , testCase "Fit 8-cycle @ 90% all" $
-      checkCycle 8 (9%10) (3 % 100)
+    -- , testCase "Fit 6-cycle @ 90% all" $
+    --   checkCycle 6 (9%10) (3 % 100)
+    -- , testCase "Fit 7-cycle @ 90% all" $
+    --   checkCycle 7 (9%10) (3 % 100)
+    -- , testCase "Fit 8-cycle @ 90% all" $
+    --   checkCycle 8 (9%10) (3 % 100)
     ]
   where
     checkCycle n p delta = do
